@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">Budget</string>
+    <string name="workspace">Workspace</string>
+    <string name="workspaces">Workspaces</string>
+    <string name="add_expense">Add Expense</string>
+    <string name="edit_expense">Edit Expense</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="total_spent">Total Spent</string>
+    <string name="total_budget">Total Budget</string>
+    <string name="remaining">Remaining</string>
+    <string name="category">Category</string>
+    <string name="amount">Amount (LKR)</string>
+    <string name="note">Note</string>
+    <string name="no_expenses">No expenses yet</string>
+    <string name="no_workspaces">No workspaces yet</string>
+</resources>

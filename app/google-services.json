@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "246292864981",
+    "project_id": "aurudu-budget",
+    "storage_bucket": "aurudu-budget.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246292864981:android:515d4486b094264f90e75c",
+        "android_client_info": {
+          "package_name": "com.budget.manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzQE2U3qxQZL1fgWFt1D5gvED8KGJNfjo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

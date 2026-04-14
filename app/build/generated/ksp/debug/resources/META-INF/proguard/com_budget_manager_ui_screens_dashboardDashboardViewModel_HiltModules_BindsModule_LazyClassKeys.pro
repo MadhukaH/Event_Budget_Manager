@@ -1,0 +1,1 @@
+-keep,allowobfuscation,allowshrinking class com.budget.manager.ui.screens.dashboard.DashboardViewModel

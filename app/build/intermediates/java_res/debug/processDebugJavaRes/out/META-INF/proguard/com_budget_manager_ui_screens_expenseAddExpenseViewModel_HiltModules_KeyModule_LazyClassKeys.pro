@@ -1,0 +1,4 @@
+-keep,allowobfuscation,allowshrinking class com.budget.manager.ui.screens.dashboard.DashboardViewModel
+-keep,allowobfuscation,allowshrinking class com.budget.manager.ui.screens.dashboard.DashboardViewModel
+-keep,allowobfuscation,allowshrinking class com.budget.manager.ui.screens.expense.AddExpenseViewModel
+-keep,allowobfuscation,allowshrinking class com.budget.manager.ui.screens.expense.AddExpenseViewModel
