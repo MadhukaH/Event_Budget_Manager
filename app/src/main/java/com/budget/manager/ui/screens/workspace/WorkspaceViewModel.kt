@@ -11,6 +11,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
+import com.budget.manager.util.NetworkObserver
+import com.budget.manager.worker.BudgetSyncWorker
 
 data class WorkspaceUiState(
     val workspace: Workspace? = null,
@@ -24,7 +28,9 @@ data class WorkspaceUiState(
 class WorkspaceViewModel @Inject constructor(
     private val workspaceRepository: WorkspaceRepository,
     private val expenseRepository: ExpenseRepository,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val workManager: WorkManager,
+    private val networkObserver: NetworkObserver
 ) : ViewModel() {
 
     private val workspaceId: Long = checkNotNull(savedStateHandle["workspaceId"])
@@ -56,6 +62,13 @@ class WorkspaceViewModel @Inject constructor(
     fun deleteExpense(expense: Expense) {
         viewModelScope.launch {
             expenseRepository.deleteExpense(expense)
+            if (networkObserver.isCurrentlyConnected()) {
+                workManager.enqueueUniqueWork(
+                    BudgetSyncWorker.WORK_NAME_ONE_TIME,
+                    ExistingWorkPolicy.REPLACE,
+                    BudgetSyncWorker.oneTimeWorkRequest()
+                )
+            }
         }
     }
 

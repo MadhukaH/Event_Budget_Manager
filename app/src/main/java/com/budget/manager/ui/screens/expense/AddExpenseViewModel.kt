@@ -9,6 +9,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
+import com.budget.manager.util.NetworkObserver
+import com.budget.manager.worker.BudgetSyncWorker
 
 data class AddExpenseUiState(
     val selectedCategory: String = "",
@@ -24,7 +28,9 @@ data class AddExpenseUiState(
 @HiltViewModel
 class AddExpenseViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val workManager: WorkManager,
+    private val networkObserver: NetworkObserver
 ) : ViewModel() {
 
     private val workspaceId: Long = checkNotNull(savedStateHandle["workspaceId"])
@@ -94,6 +100,14 @@ class AddExpenseViewModel @Inject constructor(
             )
             expenseRepository.addExpense(expense)
             _uiState.update { it.copy(isSaved = true) }
+            
+            if (networkObserver.isCurrentlyConnected()) {
+                workManager.enqueueUniqueWork(
+                    BudgetSyncWorker.WORK_NAME_ONE_TIME,
+                    ExistingWorkPolicy.REPLACE,
+                    BudgetSyncWorker.oneTimeWorkRequest()
+                )
+            }
         }
     }
 }

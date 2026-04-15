@@ -14,6 +14,9 @@ interface WorkspaceDao {
     @Query("SELECT * FROM workspaces WHERE id = :id")
     fun getWorkspaceById(id: Long): Flow<Workspace?>
 
+    @Query("SELECT * FROM workspaces WHERE id = :id")
+    suspend fun getWorkspaceByIdAsync(id: Long): Workspace?
+
     @Query("SELECT * FROM workspaces WHERE firestoreId = :firestoreId LIMIT 1")
     suspend fun getWorkspaceByFirestoreId(firestoreId: String): Workspace?
 

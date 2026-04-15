@@ -391,6 +391,64 @@ public final class WorkspaceDao_Impl implements WorkspaceDao {
   }
 
   @Override
+  public Object getWorkspaceByIdAsync(final long id,
+      final Continuation<? super Workspace> $completion) {
+    final String _sql = "SELECT * FROM workspaces WHERE id = ?";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, id);
+    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
+    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<Workspace>() {
+      @Override
+      @Nullable
+      public Workspace call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfName = CursorUtil.getColumnIndexOrThrow(_cursor, "name");
+          final int _cursorIndexOfDescription = CursorUtil.getColumnIndexOrThrow(_cursor, "description");
+          final int _cursorIndexOfTotalBudget = CursorUtil.getColumnIndexOrThrow(_cursor, "totalBudget");
+          final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
+          final int _cursorIndexOfColorIndex = CursorUtil.getColumnIndexOrThrow(_cursor, "colorIndex");
+          final int _cursorIndexOfFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "firestoreId");
+          final int _cursorIndexOfSyncStatus = CursorUtil.getColumnIndexOrThrow(_cursor, "syncStatus");
+          final int _cursorIndexOfLastModified = CursorUtil.getColumnIndexOrThrow(_cursor, "lastModified");
+          final Workspace _result;
+          if (_cursor.moveToFirst()) {
+            final long _tmpId;
+            _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final String _tmpName;
+            _tmpName = _cursor.getString(_cursorIndexOfName);
+            final String _tmpDescription;
+            _tmpDescription = _cursor.getString(_cursorIndexOfDescription);
+            final double _tmpTotalBudget;
+            _tmpTotalBudget = _cursor.getDouble(_cursorIndexOfTotalBudget);
+            final long _tmpCreatedAt;
+            _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
+            final int _tmpColorIndex;
+            _tmpColorIndex = _cursor.getInt(_cursorIndexOfColorIndex);
+            final String _tmpFirestoreId;
+            _tmpFirestoreId = _cursor.getString(_cursorIndexOfFirestoreId);
+            final SyncStatus _tmpSyncStatus;
+            final String _tmp;
+            _tmp = _cursor.getString(_cursorIndexOfSyncStatus);
+            _tmpSyncStatus = __syncStatusConverter.toSyncStatus(_tmp);
+            final long _tmpLastModified;
+            _tmpLastModified = _cursor.getLong(_cursorIndexOfLastModified);
+            _result = new Workspace(_tmpId,_tmpName,_tmpDescription,_tmpTotalBudget,_tmpCreatedAt,_tmpColorIndex,_tmpFirestoreId,_tmpSyncStatus,_tmpLastModified);
+          } else {
+            _result = null;
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+          _statement.release();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
   public Object getWorkspaceByFirestoreId(final String firestoreId,
       final Continuation<? super Workspace> $completion) {
     final String _sql = "SELECT * FROM workspaces WHERE firestoreId = ? LIMIT 1";

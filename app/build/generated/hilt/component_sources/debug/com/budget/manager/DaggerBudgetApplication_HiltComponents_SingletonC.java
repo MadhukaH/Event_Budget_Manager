@@ -494,7 +494,7 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
       public T get() {
         switch (id) {
           case 0: // com.budget.manager.ui.screens.expense.AddExpenseViewModel 
-          return (T) new AddExpenseViewModel(singletonCImpl.expenseRepositoryProvider.get(), viewModelCImpl.savedStateHandle);
+          return (T) new AddExpenseViewModel(singletonCImpl.expenseRepositoryProvider.get(), viewModelCImpl.savedStateHandle, singletonCImpl.provideWorkManagerProvider.get(), singletonCImpl.networkObserverProvider.get());
 
           case 1: // com.budget.manager.ui.screens.dashboard.DashboardViewModel 
           return (T) new DashboardViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), viewModelCImpl.savedStateHandle);
@@ -503,7 +503,7 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
           return (T) new HomeViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), singletonCImpl.networkObserverProvider.get(), singletonCImpl.provideWorkManagerProvider.get());
 
           case 3: // com.budget.manager.ui.screens.workspace.WorkspaceViewModel 
-          return (T) new WorkspaceViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), viewModelCImpl.savedStateHandle);
+          return (T) new WorkspaceViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), viewModelCImpl.savedStateHandle, singletonCImpl.provideWorkManagerProvider.get(), singletonCImpl.networkObserverProvider.get());
 
           default: throw new AssertionError(id);
         }

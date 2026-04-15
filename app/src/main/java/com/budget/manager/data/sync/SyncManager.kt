@@ -139,12 +139,9 @@ class SyncManager @Inject constructor(
     private suspend fun resolveWorkspaceFirestoreId(expense: Expense): String {
         // If expense already has the parent's Firestore ID, use it
         if (expense.workspaceFirestoreId.isNotBlank()) return expense.workspaceFirestoreId
-        // Otherwise look up the workspace in Room
-        val workspace = workspaceDao.getWorkspaceByFirestoreId("")
-        // Fallback: find workspace by local ID using a direct query pattern
-        return workspaceDao.getPendingSyncWorkspaces()
-            .find { it.id.toString() == expense.workspaceId.toString() }
-            ?.firestoreId ?: ""
+        
+        // Lookup the specific workspace in Room using its local ID
+        return workspaceDao.getWorkspaceByIdAsync(expense.workspaceId)?.firestoreId ?: ""
     }
 
     // ─── Pull: Firestore → Room ───────────────────────────────────────────────
