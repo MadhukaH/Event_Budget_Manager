@@ -13,5 +13,10 @@ service cloud.firestore {
         allow read, write: if true;
       }
     }
+
+    // App settings (e.g., Global Grant Fund)
+    match /app_settings/{document} {
+      allow read, write: if true;
+    }
   }
 }
