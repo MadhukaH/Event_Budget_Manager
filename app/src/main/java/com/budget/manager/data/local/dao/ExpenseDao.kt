@@ -2,7 +2,6 @@ package com.budget.manager.data.local.dao
 
 import androidx.room.*
 import com.budget.manager.data.model.Expense
-import com.budget.manager.data.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -23,13 +22,9 @@ interface ExpenseDao {
     @Query("SELECT category, SUM(amount) as total FROM expenses WHERE workspaceId = :workspaceId AND syncStatus != 'PENDING_DELETE' GROUP BY category ORDER BY total DESC")
     fun getCategoryTotals(workspaceId: Long): Flow<List<CategoryTotal>>
 
-    /** All records that need to be pushed to Firestore */
+    /** All expenses not yet in sync with Firestore */
     @Query("SELECT * FROM expenses WHERE syncStatus != 'SYNCED'")
     suspend fun getPendingSyncExpenses(): List<Expense>
-
-    /** Records pending sync for a specific workspace */
-    @Query("SELECT * FROM expenses WHERE workspaceId = :workspaceId AND syncStatus != 'SYNCED'")
-    suspend fun getPendingSyncExpensesForWorkspace(workspaceId: Long): List<Expense>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpense(expense: Expense): Long
@@ -43,15 +38,19 @@ interface ExpenseDao {
     @Query("DELETE FROM expenses WHERE workspaceId = :workspaceId")
     suspend fun deleteAllExpensesByWorkspace(workspaceId: Long)
 
-    @Query("UPDATE expenses SET syncStatus = 'SYNCED', firestoreId = :firestoreId WHERE id = :localId")
-    suspend fun markSynced(localId: Long, firestoreId: String)
+    /**
+     * Mark expense as SYNCED — firestoreId was already set at creation.
+     * Simply clears the dirty flag.
+     */
+    @Query("UPDATE expenses SET syncStatus = 'SYNCED' WHERE id = :localId")
+    suspend fun markSynced(localId: Long)
 
-    @Query("UPDATE expenses SET syncStatus = 'PENDING_DELETE' WHERE id = :id")
-    suspend fun markPendingDelete(id: Long)
+    @Query("UPDATE expenses SET syncStatus = 'PENDING_DELETE', lastModified = :timestamp WHERE id = :id")
+    suspend fun markPendingDelete(id: Long, timestamp: Long = System.currentTimeMillis())
 
-    /** Hard-delete records that have been removed from Firestore */
-    @Query("DELETE FROM expenses WHERE syncStatus = 'PENDING_DELETE' AND firestoreId != ''")
-    suspend fun deleteFullySyncedDeletion()
+    /** Remove hard-deleted records from Room after they're removed from Firestore */
+    @Query("DELETE FROM expenses WHERE syncStatus = 'PENDING_DELETE'")
+    suspend fun purgeDeletedExpenses()
 }
 
 data class CategoryTotal(

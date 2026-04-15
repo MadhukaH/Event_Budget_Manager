@@ -17,7 +17,7 @@ interface WorkspaceDao {
     @Query("SELECT * FROM workspaces WHERE firestoreId = :firestoreId LIMIT 1")
     suspend fun getWorkspaceByFirestoreId(firestoreId: String): Workspace?
 
-    /** Returns all records that need to be pushed to Firestore */
+    /** All records not yet in sync with Firestore */
     @Query("SELECT * FROM workspaces WHERE syncStatus != 'SYNCED'")
     suspend fun getPendingSyncWorkspaces(): List<Workspace>
 
@@ -33,11 +33,15 @@ interface WorkspaceDao {
     @Query("DELETE FROM workspaces WHERE id = :id")
     suspend fun deleteWorkspaceById(id: Long)
 
-    /** Mark a workspace as synced and store its Firestore document ID */
-    @Query("UPDATE workspaces SET syncStatus = 'SYNCED', firestoreId = :firestoreId WHERE id = :localId")
-    suspend fun markSynced(localId: Long, firestoreId: String)
+    /**
+     * Mark workspace as SYNCED.
+     * The firestoreId was already set at creation — no need to update it here.
+     * This simply clears the "dirty" flag.
+     */
+    @Query("UPDATE workspaces SET syncStatus = 'SYNCED' WHERE id = :localId")
+    suspend fun markSynced(localId: Long)
 
-    /** Soft-delete: mark for deletion, will be removed from Firestore on next sync */
-    @Query("UPDATE workspaces SET syncStatus = 'PENDING_DELETE' WHERE id = :id")
-    suspend fun markPendingDelete(id: Long)
+    /** Soft-delete: hides from UI immediately, synced deletion happens in background */
+    @Query("UPDATE workspaces SET syncStatus = 'PENDING_DELETE', lastModified = :timestamp WHERE id = :id")
+    suspend fun markPendingDelete(id: Long, timestamp: Long = System.currentTimeMillis())
 }

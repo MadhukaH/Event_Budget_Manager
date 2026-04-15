@@ -4,15 +4,18 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 /**
  * Expense entity — a single budget line item inside a workspace.
  *
- * Sync fields:
- *  - firestoreId      : Firestore document ID
- *  - workspaceFirestoreId : the parent workspace's Firestore ID (needed for Firestore path)
- *  - syncStatus       : offline state machine
- *  - lastModified     : conflict resolution timestamp
+ * Same UUID-first strategy as [Workspace]:
+ * [firestoreId] is a UUID generated locally at creation time, used as
+ * the Firestore document ID. Sync is always a set() operation — idempotent.
+ *
+ * [workspaceFirestoreId] stores the parent workspace's UUID so the
+ * Firestore path (workspaces/{id}/expenses/{id}) can be built without
+ * an extra Room lookup during sync.
  */
 @Entity(
     tableName = "expenses",
@@ -39,9 +42,9 @@ data class Expense(
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis(),
 
-    // Sync metadata
-    val firestoreId: String = "",
-    val workspaceFirestoreId: String = "",
+    // ── Sync metadata ──────────────────────────────────────────────────────
+    val firestoreId: String = UUID.randomUUID().toString(),
+    val workspaceFirestoreId: String = "",   // set by repository at creation
     val syncStatus: SyncStatus = SyncStatus.PENDING_CREATE,
     val lastModified: Long = System.currentTimeMillis()
 )

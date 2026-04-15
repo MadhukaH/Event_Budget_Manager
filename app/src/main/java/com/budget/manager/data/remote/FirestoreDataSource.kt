@@ -1,5 +1,6 @@
 package com.budget.manager.data.remote
 
+import android.util.Log
 import com.budget.manager.data.model.Expense
 import com.budget.manager.data.model.Workspace
 import com.google.firebase.firestore.FirebaseFirestore
@@ -8,110 +9,155 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val TAG = "FirestoreDataSource"
+
 /**
- * FirestoreDataSource — all direct Firestore operations.
+ * FirestoreDataSource — all direct Firestore read/write operations.
+ *
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │  ANTI-DUPLICATION GUARANTEE                                     │
+ * │                                                                 │
+ * │  Every write uses:                                              │
+ * │    document(workspace.firestoreId).set(data, merge)             │
+ * │                                                                 │
+ * │  NOT:  collection.add(data)   ← creates a NEW doc every call!  │
+ * │                                                                 │
+ * │  Because the document ID is a UUID generated at creation time,  │
+ * │  calling set() 100 times produces exactly 1 document.           │
+ * │  This makes every sync retry fully idempotent.                  │
+ * └─────────────────────────────────────────────────────────────────┘
  *
  * Firestore structure:
- * ├── workspaces/
- * │   └── {workspaceId}/
- * │       ├── name, description, totalBudget, colorIndex, createdAt, lastModified
- * │       └── expenses/                   ← subcollection
- * │           └── {expenseId}/
- * │               ├── category, amount, note, createdAt, lastModified
- * │               └── workspaceId
- *
- * All operations use await() for coroutine-friendly execution.
- * Duplicates are prevented by using Firestore document IDs as idempotency keys.
+ * workspaces/
+ *   {uuid}/                   ← document ID = Room firestoreId
+ *     name, description, totalBudget, colorIndex, createdAt, lastModified
+ *     expenses/
+ *       {uuid}/               ← document ID = Expense firestoreId
+ *         category, amount, note, workspaceId, createdAt, lastModified
  */
 @Singleton
 class FirestoreDataSource @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
-    // ─── Collection references ───────────────────────────────────────────────
 
-    private fun workspacesRef() = firestore.collection("workspaces")
+    // ── Collection helpers ────────────────────────────────────────────────────
 
-    private fun expensesRef(workspaceFirestoreId: String) =
+    private fun workspaceDoc(firestoreId: String) =
+        firestore.collection("workspaces").document(firestoreId)
+
+    private fun expenseDoc(workspaceFirestoreId: String, expenseFirestoreId: String) =
         firestore.collection("workspaces")
             .document(workspaceFirestoreId)
             .collection("expenses")
+            .document(expenseFirestoreId)
 
-    // ─── Workspace operations ────────────────────────────────────────────────
+    // ── Workspace operations ──────────────────────────────────────────────────
 
     /**
-     * Creates or upserts a workspace in Firestore.
-     * Returns the Firestore document ID (used to link the local Room record).
+     * Idempotent upsert — always writes to the same document ID.
+     * Safe to call multiple times; will never create a duplicate.
      */
-    suspend fun upsertWorkspace(workspace: Workspace): String {
-        val data = workspace.toFirestoreMap()
-        return if (workspace.firestoreId.isBlank()) {
-            // New document — Firestore generates the ID
-            val ref = workspacesRef().add(data).await()
-            ref.id
-        } else {
-            // Existing document — merge to avoid overwriting unrelated fields
-            workspacesRef().document(workspace.firestoreId).set(data, SetOptions.merge()).await()
-            workspace.firestoreId
+    suspend fun upsertWorkspace(workspace: Workspace) {
+        require(workspace.firestoreId.isNotBlank()) {
+            "firestoreId must not be blank — assign a UUID before calling upsertWorkspace()"
         }
+        Log.d(TAG, "upsertWorkspace → doc/${workspace.firestoreId}")
+        workspaceDoc(workspace.firestoreId)
+            .set(workspace.toFirestoreMap(), SetOptions.merge())
+            .await()
     }
 
     /**
-     * Soft-delete in Firestore: marks document with deleted=true.
-     * Hard-delete is done by the caller after confirmation.
+     * Deletes a workspace and all its expenses from Firestore.
+     * Uses a batch for atomic deletion of the subcollection.
      */
     suspend fun deleteWorkspace(firestoreId: String) {
-        workspacesRef().document(firestoreId).delete().await()
-        // Cascading subcollection deletion is done via a batch
-        val expenses = expensesRef(firestoreId).get().await()
-        if (!expenses.isEmpty) {
+        Log.d(TAG, "deleteWorkspace → doc/$firestoreId")
+        val expenseDocs = firestore.collection("workspaces")
+            .document(firestoreId)
+            .collection("expenses")
+            .get()
+            .await()
+
+        if (!expenseDocs.isEmpty) {
             val batch = firestore.batch()
-            expenses.documents.forEach { batch.delete(it.reference) }
+            expenseDocs.documents.forEach { batch.delete(it.reference) }
             batch.commit().await()
         }
+        workspaceDoc(firestoreId).delete().await()
     }
 
     suspend fun getAllWorkspaces(): List<RemoteWorkspace> {
-        return workspacesRef()
+        return firestore.collection("workspaces")
             .get()
             .await()
             .documents
             .mapNotNull { doc ->
-                doc.toObject(RemoteWorkspace::class.java)?.copy(firestoreId = doc.id)
+                try {
+                    RemoteWorkspace(
+                        firestoreId = doc.id,
+                        name = doc.getString("name") ?: "",
+                        description = doc.getString("description") ?: "",
+                        totalBudget = doc.getDouble("totalBudget") ?: 0.0,
+                        colorIndex = (doc.getLong("colorIndex") ?: 0L).toInt(),
+                        createdAt = doc.getLong("createdAt") ?: 0L,
+                        lastModified = doc.getLong("lastModified") ?: 0L
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "Skipping malformed workspace doc ${doc.id}", e)
+                    null
+                }
             }
     }
 
-    // ─── Expense operations ──────────────────────────────────────────────────
+    // ── Expense operations ────────────────────────────────────────────────────
 
-    suspend fun upsertExpense(expense: Expense): String {
-        val data = expense.toFirestoreMap()
-        return if (expense.firestoreId.isBlank()) {
-            val ref = expensesRef(expense.workspaceFirestoreId).add(data).await()
-            ref.id
-        } else {
-            expensesRef(expense.workspaceFirestoreId)
-                .document(expense.firestoreId)
-                .set(data, SetOptions.merge())
-                .await()
-            expense.firestoreId
-        }
+    /**
+     * Idempotent upsert — writes to a fixed document ID.
+     * Multiple calls with the same expense = exactly one Firestore document.
+     */
+    suspend fun upsertExpense(expense: Expense) {
+        require(expense.firestoreId.isNotBlank()) { "expense firestoreId must not be blank" }
+        require(expense.workspaceFirestoreId.isNotBlank()) { "workspaceFirestoreId must not be blank" }
+
+        Log.d(TAG, "upsertExpense → ${expense.workspaceFirestoreId}/expenses/${expense.firestoreId}")
+        expenseDoc(expense.workspaceFirestoreId, expense.firestoreId)
+            .set(expense.toFirestoreMap(), SetOptions.merge())
+            .await()
     }
 
     suspend fun deleteExpense(workspaceFirestoreId: String, expenseFirestoreId: String) {
-        expensesRef(workspaceFirestoreId).document(expenseFirestoreId).delete().await()
+        Log.d(TAG, "deleteExpense → $workspaceFirestoreId/expenses/$expenseFirestoreId")
+        expenseDoc(workspaceFirestoreId, expenseFirestoreId).delete().await()
     }
 
     suspend fun getExpensesForWorkspace(workspaceFirestoreId: String): List<RemoteExpense> {
-        return expensesRef(workspaceFirestoreId)
+        return firestore.collection("workspaces")
+            .document(workspaceFirestoreId)
+            .collection("expenses")
             .get()
             .await()
             .documents
             .mapNotNull { doc ->
-                doc.toObject(RemoteExpense::class.java)?.copy(firestoreId = doc.id)
+                try {
+                    RemoteExpense(
+                        firestoreId = doc.id,
+                        workspaceFirestoreId = workspaceFirestoreId,
+                        category = doc.getString("category") ?: "",
+                        amount = doc.getDouble("amount") ?: 0.0,
+                        note = doc.getString("note") ?: "",
+                        createdAt = doc.getLong("createdAt") ?: 0L,
+                        lastModified = doc.getLong("lastModified") ?: 0L
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "Skipping malformed expense doc ${doc.id}", e)
+                    null
+                }
             }
     }
 }
 
-// ─── Extension: Domain → Firestore map ──────────────────────────────────────
+// ── Serialization helpers ─────────────────────────────────────────────────────
 
 private fun Workspace.toFirestoreMap(): Map<String, Any> = mapOf(
     "name" to name,
@@ -131,9 +177,8 @@ private fun Expense.toFirestoreMap(): Map<String, Any> = mapOf(
     "lastModified" to lastModified
 )
 
-// ─── Remote DTOs ─────────────────────────────────────────────────────────────
+// ── Remote DTOs ───────────────────────────────────────────────────────────────
 
-/** Data Transfer Object for Firestore Workspace documents */
 data class RemoteWorkspace(
     val firestoreId: String = "",
     val name: String = "",
@@ -144,10 +189,9 @@ data class RemoteWorkspace(
     val lastModified: Long = 0L
 )
 
-/** Data Transfer Object for Firestore Expense documents */
 data class RemoteExpense(
     val firestoreId: String = "",
-    val workspaceId: String = "",
+    val workspaceFirestoreId: String = "",
     val category: String = "",
     val amount: Double = 0.0,
     val note: String = "",

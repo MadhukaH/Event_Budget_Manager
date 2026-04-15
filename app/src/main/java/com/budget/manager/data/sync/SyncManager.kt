@@ -81,9 +81,9 @@ class SyncManager @Inject constructor(
             try {
                 when (workspace.syncStatus) {
                     SyncStatus.PENDING_CREATE, SyncStatus.PENDING_UPDATE -> {
-                        val firestoreId = firestoreDataSource.upsertWorkspace(workspace)
-                        workspaceDao.markSynced(workspace.id, firestoreId)
-                        Log.d(TAG, "  ✓ Workspace synced: ${workspace.name} → $firestoreId")
+                        firestoreDataSource.upsertWorkspace(workspace)
+                        workspaceDao.markSynced(workspace.id)
+                        Log.d(TAG, "  ✓ Workspace synced: ${workspace.name} → ${workspace.firestoreId}")
                     }
                     SyncStatus.PENDING_DELETE -> {
                         if (workspace.firestoreId.isNotBlank()) {
@@ -117,9 +117,9 @@ class SyncManager @Inject constructor(
                             Log.w(TAG, "  ⚠ Skipping expense — parent workspace not yet synced")
                             continue
                         }
-                        val firestoreId = firestoreDataSource.upsertExpense(expenseWithParent)
-                        expenseDao.markSynced(expense.id, firestoreId)
-                        Log.d(TAG, "  ✓ Expense synced: ${expense.category} → $firestoreId")
+                        firestoreDataSource.upsertExpense(expenseWithParent)
+                        expenseDao.markSynced(expense.id)
+                        Log.d(TAG, "  ✓ Expense synced: ${expense.category} → ${expense.firestoreId}")
                     }
                     SyncStatus.PENDING_DELETE -> {
                         if (expense.firestoreId.isNotBlank() && workspaceFirestoreId.isNotBlank()) {

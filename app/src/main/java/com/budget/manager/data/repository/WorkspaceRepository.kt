@@ -9,30 +9,40 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * WorkspaceRepository — single source of truth for workspace data.
+ * WorkspaceRepository — single source of truth, offline-first.
  *
- * Offline-first strategy:
- * - ALL reads come from Room (reactive Flow, instant updates)
- * - ALL writes go to Room first, with SyncStatus marking them dirty
- * - SyncManager / WorkManager handles pushing dirty records to Firestore
+ * UUID-first guarantee:
+ * Every new Workspace is assigned a [firestoreId] (UUID) before it is saved
+ * to Room. This ID is used as the Firestore document ID on first sync.
+ * Because the ID is stable, syncing the same workspace 100 times will always
+ * result in exactly ONE document in Firestore.
  *
- * This means UI is always fast (no waiting for network), and data is
- * eventually consistent with Firestore.
+ * Write flow:
+ * 1. Build Workspace with UUID firestoreId + SyncStatus.PENDING_CREATE
+ * 2. Save to Room immediately → UI reacts instantly
+ * 3. SyncManager picks it up and calls Firestore.set(firestoreId, data)
+ * 4. SyncManager calls markSynced(localId) → status becomes SYNCED
  */
 @Singleton
 class WorkspaceRepository @Inject constructor(
     private val workspaceDao: WorkspaceDao,
     private val networkObserver: NetworkObserver
 ) {
-    // ─── Reads (Room as source of truth) ─────────────────────────────────────
+    // ── Reads ─────────────────────────────────────────────────────────────────
 
     fun getAllWorkspaces(): Flow<List<Workspace>> = workspaceDao.getAllWorkspaces()
 
     fun getWorkspaceById(id: Long): Flow<Workspace?> = workspaceDao.getWorkspaceById(id)
 
-    // ─── Writes (Room first, then flagged for sync) ───────────────────────────
+    // ── Writes ────────────────────────────────────────────────────────────────
 
+    /**
+     * Creates a workspace locally.
+     * The UUID [firestoreId] is assigned in the Workspace constructor default
+     * parameter (UUID.randomUUID()). Caller does not need to supply it.
+     */
     suspend fun createWorkspace(workspace: Workspace): Long {
+        // Ensure it's tagged as pending — firestoreId is already a UUID
         val toInsert = workspace.copy(
             syncStatus = SyncStatus.PENDING_CREATE,
             lastModified = System.currentTimeMillis()
@@ -41,24 +51,26 @@ class WorkspaceRepository @Inject constructor(
     }
 
     suspend fun updateWorkspace(workspace: Workspace) {
-        val toUpdate = workspace.copy(
-            syncStatus = SyncStatus.PENDING_UPDATE,
-            lastModified = System.currentTimeMillis()
+        workspaceDao.updateWorkspace(
+            workspace.copy(
+                syncStatus = SyncStatus.PENDING_UPDATE,
+                lastModified = System.currentTimeMillis()
+            )
         )
-        workspaceDao.updateWorkspace(toUpdate)
     }
 
     /**
-     * Soft-delete: marks workspace as PENDING_DELETE.
-     * It will be excluded from queries immediately (DAO filters PENDING_DELETE),
-     * and will be permanently removed from both Room and Firestore by SyncManager.
+     * Soft-delete: workspace is hidden from UI immediately.
+     * If it was never synced (UUID exists only in Room), hard-delete it.
+     * If it was synced, mark PENDING_DELETE so SyncManager removes it from
+     * Firestore on next sync.
      */
     suspend fun deleteWorkspace(workspace: Workspace) {
-        if (workspace.firestoreId.isBlank()) {
-            // Never synced to Firestore — safe to hard-delete immediately
+        if (workspace.syncStatus == SyncStatus.PENDING_CREATE) {
+            // Never reached Firestore — safe to hard-delete immediately
             workspaceDao.deleteWorkspace(workspace)
         } else {
-            // Has Firestore record — soft-delete and let SyncManager handle it
+            // Has a Firestore record — soft-delete and let SyncManager handle it
             workspaceDao.markPendingDelete(workspace.id)
         }
     }

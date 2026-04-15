@@ -123,7 +123,7 @@ public final class WorkspaceDao_Impl implements WorkspaceDao {
       @Override
       @NonNull
       public String createQuery() {
-        final String _query = "UPDATE workspaces SET syncStatus = 'SYNCED', firestoreId = ? WHERE id = ?";
+        final String _query = "UPDATE workspaces SET syncStatus = 'SYNCED' WHERE id = ?";
         return _query;
       }
     };
@@ -131,7 +131,7 @@ public final class WorkspaceDao_Impl implements WorkspaceDao {
       @Override
       @NonNull
       public String createQuery() {
-        final String _query = "UPDATE workspaces SET syncStatus = 'PENDING_DELETE' WHERE id = ?";
+        final String _query = "UPDATE workspaces SET syncStatus = 'PENDING_DELETE', lastModified = ? WHERE id = ?";
         return _query;
       }
     };
@@ -220,16 +220,13 @@ public final class WorkspaceDao_Impl implements WorkspaceDao {
   }
 
   @Override
-  public Object markSynced(final long localId, final String firestoreId,
-      final Continuation<? super Unit> $completion) {
+  public Object markSynced(final long localId, final Continuation<? super Unit> $completion) {
     return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
       @Override
       @NonNull
       public Unit call() throws Exception {
         final SupportSQLiteStatement _stmt = __preparedStmtOfMarkSynced.acquire();
         int _argIndex = 1;
-        _stmt.bindString(_argIndex, firestoreId);
-        _argIndex = 2;
         _stmt.bindLong(_argIndex, localId);
         try {
           __db.beginTransaction();
@@ -248,13 +245,16 @@ public final class WorkspaceDao_Impl implements WorkspaceDao {
   }
 
   @Override
-  public Object markPendingDelete(final long id, final Continuation<? super Unit> $completion) {
+  public Object markPendingDelete(final long id, final long timestamp,
+      final Continuation<? super Unit> $completion) {
     return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
       @Override
       @NonNull
       public Unit call() throws Exception {
         final SupportSQLiteStatement _stmt = __preparedStmtOfMarkPendingDelete.acquire();
         int _argIndex = 1;
+        _stmt.bindLong(_argIndex, timestamp);
+        _argIndex = 2;
         _stmt.bindLong(_argIndex, id);
         try {
           __db.beginTransaction();

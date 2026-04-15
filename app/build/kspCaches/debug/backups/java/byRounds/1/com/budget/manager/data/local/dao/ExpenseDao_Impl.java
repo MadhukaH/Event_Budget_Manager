@@ -52,7 +52,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
 
   private final SharedSQLiteStatement __preparedStmtOfMarkPendingDelete;
 
-  private final SharedSQLiteStatement __preparedStmtOfDeleteFullySyncedDeletion;
+  private final SharedSQLiteStatement __preparedStmtOfPurgeDeletedExpenses;
 
   public ExpenseDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
@@ -128,7 +128,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
       @Override
       @NonNull
       public String createQuery() {
-        final String _query = "UPDATE expenses SET syncStatus = 'SYNCED', firestoreId = ? WHERE id = ?";
+        final String _query = "UPDATE expenses SET syncStatus = 'SYNCED' WHERE id = ?";
         return _query;
       }
     };
@@ -136,15 +136,15 @@ public final class ExpenseDao_Impl implements ExpenseDao {
       @Override
       @NonNull
       public String createQuery() {
-        final String _query = "UPDATE expenses SET syncStatus = 'PENDING_DELETE' WHERE id = ?";
+        final String _query = "UPDATE expenses SET syncStatus = 'PENDING_DELETE', lastModified = ? WHERE id = ?";
         return _query;
       }
     };
-    this.__preparedStmtOfDeleteFullySyncedDeletion = new SharedSQLiteStatement(__db) {
+    this.__preparedStmtOfPurgeDeletedExpenses = new SharedSQLiteStatement(__db) {
       @Override
       @NonNull
       public String createQuery() {
-        final String _query = "DELETE FROM expenses WHERE syncStatus = 'PENDING_DELETE' AND firestoreId != ''";
+        final String _query = "DELETE FROM expenses WHERE syncStatus = 'PENDING_DELETE'";
         return _query;
       }
     };
@@ -231,16 +231,13 @@ public final class ExpenseDao_Impl implements ExpenseDao {
   }
 
   @Override
-  public Object markSynced(final long localId, final String firestoreId,
-      final Continuation<? super Unit> $completion) {
+  public Object markSynced(final long localId, final Continuation<? super Unit> $completion) {
     return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
       @Override
       @NonNull
       public Unit call() throws Exception {
         final SupportSQLiteStatement _stmt = __preparedStmtOfMarkSynced.acquire();
         int _argIndex = 1;
-        _stmt.bindString(_argIndex, firestoreId);
-        _argIndex = 2;
         _stmt.bindLong(_argIndex, localId);
         try {
           __db.beginTransaction();
@@ -259,13 +256,16 @@ public final class ExpenseDao_Impl implements ExpenseDao {
   }
 
   @Override
-  public Object markPendingDelete(final long id, final Continuation<? super Unit> $completion) {
+  public Object markPendingDelete(final long id, final long timestamp,
+      final Continuation<? super Unit> $completion) {
     return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
       @Override
       @NonNull
       public Unit call() throws Exception {
         final SupportSQLiteStatement _stmt = __preparedStmtOfMarkPendingDelete.acquire();
         int _argIndex = 1;
+        _stmt.bindLong(_argIndex, timestamp);
+        _argIndex = 2;
         _stmt.bindLong(_argIndex, id);
         try {
           __db.beginTransaction();
@@ -284,12 +284,12 @@ public final class ExpenseDao_Impl implements ExpenseDao {
   }
 
   @Override
-  public Object deleteFullySyncedDeletion(final Continuation<? super Unit> $completion) {
+  public Object purgeDeletedExpenses(final Continuation<? super Unit> $completion) {
     return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
       @Override
       @NonNull
       public Unit call() throws Exception {
-        final SupportSQLiteStatement _stmt = __preparedStmtOfDeleteFullySyncedDeletion.acquire();
+        final SupportSQLiteStatement _stmt = __preparedStmtOfPurgeDeletedExpenses.acquire();
         try {
           __db.beginTransaction();
           try {
@@ -300,7 +300,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             __db.endTransaction();
           }
         } finally {
-          __preparedStmtOfDeleteFullySyncedDeletion.release(_stmt);
+          __preparedStmtOfPurgeDeletedExpenses.release(_stmt);
         }
       }
     }, $completion);
@@ -568,67 +568,6 @@ public final class ExpenseDao_Impl implements ExpenseDao {
   public Object getPendingSyncExpenses(final Continuation<? super List<Expense>> $completion) {
     final String _sql = "SELECT * FROM expenses WHERE syncStatus != 'SYNCED'";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
-    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
-    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<Expense>>() {
-      @Override
-      @NonNull
-      public List<Expense> call() throws Exception {
-        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
-        try {
-          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
-          final int _cursorIndexOfWorkspaceId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceId");
-          final int _cursorIndexOfCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "category");
-          final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
-          final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
-          final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
-          final int _cursorIndexOfFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "firestoreId");
-          final int _cursorIndexOfWorkspaceFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceFirestoreId");
-          final int _cursorIndexOfSyncStatus = CursorUtil.getColumnIndexOrThrow(_cursor, "syncStatus");
-          final int _cursorIndexOfLastModified = CursorUtil.getColumnIndexOrThrow(_cursor, "lastModified");
-          final List<Expense> _result = new ArrayList<Expense>(_cursor.getCount());
-          while (_cursor.moveToNext()) {
-            final Expense _item;
-            final long _tmpId;
-            _tmpId = _cursor.getLong(_cursorIndexOfId);
-            final long _tmpWorkspaceId;
-            _tmpWorkspaceId = _cursor.getLong(_cursorIndexOfWorkspaceId);
-            final String _tmpCategory;
-            _tmpCategory = _cursor.getString(_cursorIndexOfCategory);
-            final double _tmpAmount;
-            _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
-            final String _tmpNote;
-            _tmpNote = _cursor.getString(_cursorIndexOfNote);
-            final long _tmpCreatedAt;
-            _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
-            final String _tmpFirestoreId;
-            _tmpFirestoreId = _cursor.getString(_cursorIndexOfFirestoreId);
-            final String _tmpWorkspaceFirestoreId;
-            _tmpWorkspaceFirestoreId = _cursor.getString(_cursorIndexOfWorkspaceFirestoreId);
-            final SyncStatus _tmpSyncStatus;
-            final String _tmp;
-            _tmp = _cursor.getString(_cursorIndexOfSyncStatus);
-            _tmpSyncStatus = __syncStatusConverter.toSyncStatus(_tmp);
-            final long _tmpLastModified;
-            _tmpLastModified = _cursor.getLong(_cursorIndexOfLastModified);
-            _item = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
-            _result.add(_item);
-          }
-          return _result;
-        } finally {
-          _cursor.close();
-          _statement.release();
-        }
-      }
-    }, $completion);
-  }
-
-  @Override
-  public Object getPendingSyncExpensesForWorkspace(final long workspaceId,
-      final Continuation<? super List<Expense>> $completion) {
-    final String _sql = "SELECT * FROM expenses WHERE workspaceId = ? AND syncStatus != 'SYNCED'";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
-    int _argIndex = 1;
-    _statement.bindLong(_argIndex, workspaceId);
     final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
     return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<Expense>>() {
       @Override
