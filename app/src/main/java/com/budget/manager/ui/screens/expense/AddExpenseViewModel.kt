@@ -38,6 +38,8 @@ class AddExpenseViewModel @Inject constructor(
     private val workspaceId: Long = checkNotNull(savedStateHandle["workspaceId"])
     private val expenseId: Long? = savedStateHandle.get<Long>("expenseId")?.takeIf { it != -1L }
 
+    private var originalExpense: Expense? = null
+
     private val _uiState = MutableStateFlow(AddExpenseUiState())
     val uiState: StateFlow<AddExpenseUiState> = _uiState.asStateFlow()
 
@@ -49,6 +51,7 @@ class AddExpenseViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val expense = expenseRepository.getExpenseById(id)
+            originalExpense = expense
             expense?.let { e ->
                 _uiState.update {
                     it.copy(
@@ -110,15 +113,25 @@ class AddExpenseViewModel @Inject constructor(
         if (hasError) return
 
         viewModelScope.launch {
-            val expense = Expense(
-                id = expenseId ?: 0L,
-                workspaceId = workspaceId,
-                category = state.selectedCategory,
-                amount = amount!!,
-                note = state.note,
-                receiptBase64 = state.receiptBase64
-            )
-            expenseRepository.addExpense(expense)
+            if (originalExpense != null) {
+                val updatedExpense = originalExpense!!.copy(
+                    category = state.selectedCategory,
+                    amount = amount!!,
+                    note = state.note,
+                    receiptBase64 = state.receiptBase64
+                )
+                expenseRepository.updateExpense(updatedExpense)
+            } else {
+                val expense = Expense(
+                    workspaceId = workspaceId,
+                    category = state.selectedCategory,
+                    amount = amount!!,
+                    note = state.note,
+                    receiptBase64 = state.receiptBase64
+                )
+                expenseRepository.addExpense(expense)
+            }
+            
             _uiState.update { it.copy(isSaved = true) }
             
             if (networkObserver.isCurrentlyConnected()) {
