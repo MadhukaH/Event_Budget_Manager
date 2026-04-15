@@ -156,6 +156,32 @@ class FirestoreDataSource @Inject constructor(
                 }
             }
     }
+
+    // ── Grant Settings operations ─────────────────────────────────────────────
+
+    suspend fun upsertGrantMoney(totalGrant: Double, lastModified: Long) {
+        Log.d(TAG, "upsertGrantMoney → $totalGrant")
+        firestore.collection("app_settings")
+            .document("global_grant")
+            .set(
+                mapOf(
+                    "totalGrant" to totalGrant,
+                    "lastModified" to lastModified
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    suspend fun fetchGrantMoney(): Double? {
+        return try {
+            val doc = firestore.collection("app_settings").document("global_grant").get().await()
+            doc.getDouble("totalGrant")
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchGrantMoney failed", e)
+            null
+        }
+    }
 }
 
 // ── Serialization helpers ─────────────────────────────────────────────────────

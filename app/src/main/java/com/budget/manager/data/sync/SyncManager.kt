@@ -2,6 +2,7 @@ package com.budget.manager.data.sync
 
 import android.util.Log
 import com.budget.manager.data.local.dao.ExpenseDao
+import com.budget.manager.data.local.dao.GrantDao
 import com.budget.manager.data.local.dao.WorkspaceDao
 import com.budget.manager.data.model.Expense
 import com.budget.manager.data.model.SyncStatus
@@ -34,6 +35,7 @@ private const val TAG = "SyncManager"
 class SyncManager @Inject constructor(
     private val workspaceDao: WorkspaceDao,
     private val expenseDao: ExpenseDao,
+    private val grantDao: GrantDao,
     private val firestoreDataSource: FirestoreDataSource,
     private val networkObserver: NetworkObserver
 ) {
@@ -57,10 +59,13 @@ class SyncManager @Inject constructor(
             // Step 2: Push local expense changes to Firestore
             syncExpensesToFirestore()
 
-            // Step 3: Pull Firestore workspaces → Room
+            // Step 3: Push pending grant changes to Firestore
+            syncGrantToFirestore()
+
+            // Step 4: Pull Firestore workspaces → Room
             pullWorkspacesFromFirestore()
 
-            // Step 4: Pull Firestore expenses → Room (for each synced workspace)
+            // Step 5: Pull Firestore expenses → Room (for each synced workspace)
             pullExpensesFromFirestore()
 
             Log.d(TAG, "syncAll: completed successfully")
@@ -194,6 +199,18 @@ class SyncManager @Inject constructor(
         // A more complete implementation would track all workspaceFirestoreIds
     }
 
+    private suspend fun syncGrantToFirestore() {
+        val grant = grantDao.getGrantSettingsOnce() ?: return
+        if (grant.syncStatus == SyncStatus.SYNCED) return
+        try {
+            firestoreDataSource.upsertGrantMoney(grant.totalGrant, grant.lastModified)
+            grantDao.markSynced()
+            Log.d(TAG, "  ✓ Grant synced → ${grant.totalGrant}")
+        } catch (e: Exception) {
+            Log.e(TAG, "  ✗ Failed to sync grant: ${e.message}")
+        }
+    }
+
     /**
      * Lightweight sync — only push pending local changes.
      * Used when online status is detected mid-session.
@@ -203,6 +220,7 @@ class SyncManager @Inject constructor(
         return@withContext try {
             syncWorkspacesToFirestore()
             syncExpensesToFirestore()
+            syncGrantToFirestore()
             SyncResult.Success
         } catch (e: Exception) {
             SyncResult.Error(e.message ?: "Sync failed")

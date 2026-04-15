@@ -18,10 +18,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,6 +36,11 @@ import com.budget.manager.ui.components.EmptyStateView
 import com.budget.manager.ui.theme.WorkspaceColors
 import java.text.NumberFormat
 import java.util.*
+
+// ─── Premium Colors ───────────────────────────────────────────────────────────
+private val GrantGreen = Color(0xFF00C853)
+private val GrantAmber = Color(0xFFFFAB00)
+private val GrantRed   = Color(0xFFFF1744)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +65,6 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.headlineLarge,
                                 fontWeight = FontWeight.ExtraBold
                             )
-                            // Online / offline indicator dot
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
@@ -68,9 +75,9 @@ fun HomeScreen(
                             )
                         }
                         Text(
-                            text = if (uiState.isOnline) 
+                            text = if (uiState.isOnline)
                                 "${uiState.workspaces.size} workspace${if (uiState.workspaces.size != 1) "s" else ""} · Synced"
-                            else 
+                            else
                                 "${uiState.workspaces.size} workspace${if (uiState.workspaces.size != 1) "s" else ""} · Offline",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -78,6 +85,14 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    // Grant Fund button
+                    IconButton(onClick = { viewModel.showGrantDialog() }) {
+                        Icon(
+                            Icons.Default.AccountBalance,
+                            contentDescription = "Set Grant Fund",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     if (uiState.isOnline) {
                         IconButton(onClick = { viewModel.triggerImmediateSync() }) {
                             Icon(
@@ -109,13 +124,6 @@ fun HomeScreen(
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (uiState.workspaces.isEmpty()) {
-                EmptyStateView(
-                    icon = Icons.Default.FolderOpen,
-                    title = "No Workspaces Yet",
-                    subtitle = "Create a workspace to start tracking your event budget",
-                    modifier = Modifier.align(Alignment.Center)
-                )
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(
@@ -126,32 +134,63 @@ fun HomeScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(
-                        items = uiState.workspaces,
-                        key = { it.workspace.id }
-                    ) { item ->
-                        WorkspaceCard(
-                            workspaceWithTotal = item,
-                            onClick = { onWorkspaceClick(item.workspace.id) },
-                            onDelete = { workspaceToDelete = item.workspace }
+                    // ─── Grant Wallet Card ─────────────────────────────────────
+                    item {
+                        GrantWalletCard(
+                            grantState = uiState.grantState,
+                            onEditClick = { viewModel.showGrantDialog() }
                         )
+                    }
+
+                    // ─── Workspace List ────────────────────────────────────────
+                    if (uiState.workspaces.isEmpty()) {
+                        item {
+                            EmptyStateView(
+                                icon = Icons.Default.FolderOpen,
+                                title = "No Workspaces Yet",
+                                subtitle = "Create a workspace to start tracking your event budget",
+                                modifier = Modifier.padding(top = 40.dp)
+                            )
+                        }
+                    } else {
+                        items(
+                            items = uiState.workspaces,
+                            key = { it.workspace.id }
+                        ) { item ->
+                            WorkspaceCard(
+                                workspaceWithTotal = item,
+                                onClick = { onWorkspaceClick(item.workspace.id) },
+                                onDelete = { workspaceToDelete = item.workspace }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    // Create workspace dialog
+    // ─── Grant Dialog ──────────────────────────────────────────────────────────
+    if (uiState.showGrantDialog) {
+        SetGrantDialog(
+            currentGrant = uiState.grantState.totalGrant,
+            remaining = uiState.grantState.remaining,
+            onDismiss = { viewModel.hideGrantDialog() },
+            onSave = { viewModel.saveGrantAmount(it) }
+        )
+    }
+
+    // ─── Create Workspace Dialog ───────────────────────────────────────────────
     if (uiState.showCreateDialog) {
         CreateWorkspaceDialog(
             onDismiss = { viewModel.hideCreateDialog() },
+            remainingGrant = uiState.grantState.remaining,
+            hasGrant = uiState.grantState.hasGrant,
             onCreate = { name, desc, budget, colorIdx ->
                 viewModel.createWorkspace(name, desc, budget, colorIdx)
             }
         )
     }
 
-    // Delete confirmation
     workspaceToDelete?.let { workspace ->
         DeleteConfirmationDialog(
             title = "Delete Workspace",
@@ -164,13 +203,315 @@ fun HomeScreen(
         )
     }
 
-    // Error snackbar
-    uiState.errorMessage?.let { msg ->
-        LaunchedEffect(msg) {
-            viewModel.clearError()
+    uiState.errorMessage?.let {
+        LaunchedEffect(it) { viewModel.clearError() }
+    }
+}
+
+// ─── Grant Wallet Card ────────────────────────────────────────────────────────
+
+@Composable
+fun GrantWalletCard(
+    grantState: GrantState,
+    onEditClick: () -> Unit
+) {
+    val remainingColor = when {
+        !grantState.hasGrant -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        grantState.usagePercent >= 0.9f -> GrantRed
+        grantState.usagePercent >= 0.7f -> GrantAmber
+        else -> GrantGreen
+    }
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = grantState.usagePercent,
+        animationSpec = tween(900, easing = EaseOutCubic),
+        label = "grantProgress"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp, RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    )
+                )
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                // Header row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AccountBalance,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Text(
+                            "Grant Fund",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    IconButton(
+                        onClick = onEditClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit Grant",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Main figures
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Total Grant
+                    Column {
+                        Text(
+                            "Total Grant",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = if (grantState.hasGrant) formatCurrency(grantState.totalGrant)
+                                   else "Not Set",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+
+                    // Remaining
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "Remaining",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = if (grantState.hasGrant) formatCurrency(grantState.remaining)
+                                   else "—",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = remainingColor
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Distribution bar
+                if (grantState.hasGrant) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Allocated to Workspaces",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                text = "${(grantState.usagePercent * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = remainingColor
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = remainingColor,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            strokeCap = StrokeCap.Round
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "${formatCurrency(grantState.totalAllocated)} distributed across workspaces",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
+                        )
+                    }
+                } else {
+                    // Prompt to set grant
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                            .clickable { onEditClick() }
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.AddCircleOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Tap to set your total grant fund",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
+// ─── Set Grant Dialog ─────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SetGrantDialog(
+    currentGrant: Double,
+    remaining: Double,
+    onDismiss: () -> Unit,
+    onSave: (Double) -> Unit
+) {
+    var amountText by remember {
+        mutableStateOf(if (currentGrant > 0.0) currentGrant.toLong().toString() else "")
+    }
+    var error by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Default.AccountBalance,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+        },
+        title = {
+            Text(
+                "Grant Fund",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Set the total available grant money. Workspace budgets will be distributed from this pool.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it; error = false },
+                    label = { Text("Total Grant Amount (LKR)") },
+                    placeholder = { Text("e.g. 500000") },
+                    prefix = { Text("Rs. ") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    isError = error,
+                    supportingText = if (error) {
+                        { Text("Please enter a valid amount") }
+                    } else null,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                if (currentGrant > 0.0) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Current remaining: ${formatCurrency(remaining)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = amountText.toDoubleOrNull()
+                    if (amount == null || amount < 0) {
+                        error = true
+                    } else {
+                        onSave(amount)
+                    }
+                },
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Save Grant")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+// ─── Workspace Card ───────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -198,7 +539,6 @@ fun WorkspaceCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
-            // Colored header bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -228,7 +568,6 @@ fun WorkspaceCard(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            // Pending sync badge
                             AnimatedVisibility(visible = isPendingSync) {
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
@@ -325,10 +664,14 @@ fun WorkspaceCard(
     }
 }
 
+// ─── Create Workspace Dialog ──────────────────────────────────────────────────
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateWorkspaceDialog(
     onDismiss: () -> Unit,
+    remainingGrant: Double,
+    hasGrant: Boolean,
     onCreate: (String, String, Double, Int) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
@@ -336,12 +679,58 @@ fun CreateWorkspaceDialog(
     var budgetText by remember { mutableStateOf("") }
     var selectedColorIndex by remember { mutableIntStateOf(0) }
     var nameError by remember { mutableStateOf(false) }
+    var budgetError by remember { mutableStateOf(false) }
+
+    val enteredBudget = budgetText.toDoubleOrNull() ?: 0.0
+    val exceedsGrant = hasGrant && enteredBudget > remainingGrant
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New Workspace", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Show remaining grant if set
+                if (hasGrant) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (remainingGrant > 0)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                if (remainingGrant > 0) Icons.Default.AccountBalance
+                                else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (remainingGrant > 0)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (remainingGrant > 0)
+                                    "Remaining grant: ${formatCurrency(remainingGrant)}"
+                                else
+                                    "No remaining grant funds",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = if (remainingGrant > 0)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; nameError = false },
@@ -350,24 +739,33 @@ fun CreateWorkspaceDialog(
                     isError = nameError,
                     supportingText = if (nameError) {{ Text("Name is required") }} else null,
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description (optional)") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
                 OutlinedTextField(
                     value = budgetText,
-                    onValueChange = { budgetText = it },
-                    label = { Text("Total Budget (LKR)") },
+                    onValueChange = { budgetText = it; budgetError = false },
+                    label = { Text("Budget (LKR)") },
                     placeholder = { Text("0.00") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    prefix = { Text("Rs. ") }
+                    prefix = { Text("Rs. ") },
+                    isError = budgetError || exceedsGrant,
+                    supportingText = when {
+                        budgetError -> {{ Text("Enter a valid amount") }}
+                        exceedsGrant -> {{ Text("Exceeds remaining grant of ${formatCurrency(remainingGrant)}") }}
+                        else -> null
+                    },
+                    shape = RoundedCornerShape(14.dp)
                 )
                 Text(
                     text = "Color",
@@ -401,18 +799,19 @@ fun CreateWorkspaceDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
-                if (name.isBlank()) {
-                    nameError = true
-                    return@Button
-                }
-                onCreate(
-                    name,
-                    description,
-                    budgetText.toDoubleOrNull() ?: 0.0,
-                    selectedColorIndex
-                )
-            }) {
+            Button(
+                onClick = {
+                    if (name.isBlank()) { nameError = true; return@Button }
+                    if (exceedsGrant) return@Button
+                    onCreate(
+                        name,
+                        description,
+                        budgetText.toDoubleOrNull() ?: 0.0,
+                        selectedColorIndex
+                    )
+                },
+                shape = RoundedCornerShape(12.dp)
+            ) {
                 Text("Create")
             }
         },
@@ -421,6 +820,8 @@ fun CreateWorkspaceDialog(
         }
     )
 }
+
+// ─── Currency formatter ────────────────────────────────────────────────────────
 
 fun formatCurrency(amount: Double): String {
     val format = NumberFormat.getCurrencyInstance(Locale("si", "LK"))

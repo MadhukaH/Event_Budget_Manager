@@ -98,10 +98,10 @@ dependencies {
 
     // Room Database
     implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
     ksp(libs.room.compiler)
-
-    // DataStore
+    implementation(libs.room.ktx)
+    
+    // DataStore (Preferences)
     implementation(libs.androidx.datastore.preferences)
 
     // Firebase (using BOM for version management)

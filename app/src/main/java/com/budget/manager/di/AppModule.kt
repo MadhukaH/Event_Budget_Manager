@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.work.WorkManager
 import com.budget.manager.data.local.BudgetDatabase
 import com.budget.manager.data.local.dao.ExpenseDao
+import com.budget.manager.data.local.dao.GrantDao
 import com.budget.manager.data.local.dao.WorkspaceDao
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
@@ -41,6 +42,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideExpenseDao(database: BudgetDatabase): ExpenseDao = database.expenseDao()
+
+    @Provides
+    @Singleton
+    fun provideGrantDao(database: BudgetDatabase): GrantDao = database.grantDao()
 
     // ─── Firebase Firestore ───────────────────────────────────────────────────
 

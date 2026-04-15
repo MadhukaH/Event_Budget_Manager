@@ -13,6 +13,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
 import androidx.sqlite.db.SupportSQLiteOpenHelper;
 import com.budget.manager.data.local.dao.ExpenseDao;
 import com.budget.manager.data.local.dao.ExpenseDao_Impl;
+import com.budget.manager.data.local.dao.GrantDao;
+import com.budget.manager.data.local.dao.GrantDao_Impl;
 import com.budget.manager.data.local.dao.WorkspaceDao;
 import com.budget.manager.data.local.dao.WorkspaceDao_Impl;
 import java.lang.Class;
@@ -35,10 +37,12 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
 
   private volatile ExpenseDao _expenseDao;
 
+  private volatile GrantDao _grantDao;
+
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(4) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(5) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `workspaces` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `totalBudget` REAL NOT NULL, `createdAt` INTEGER NOT NULL, `colorIndex` INTEGER NOT NULL, `firestoreId` TEXT NOT NULL, `syncStatus` TEXT NOT NULL, `lastModified` INTEGER NOT NULL)");
@@ -46,14 +50,16 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_workspaceId` ON `expenses` (`workspaceId`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_syncStatus` ON `expenses` (`syncStatus`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_firestoreId` ON `expenses` (`firestoreId`)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `grant_settings` (`id` INTEGER NOT NULL, `totalGrant` REAL NOT NULL, `firestoreId` TEXT NOT NULL, `syncStatus` TEXT NOT NULL, `lastModified` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd92bffcda70a3889e90936d441a9a96d')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1f56d941608522c1100aa4eb81d271d2')");
       }
 
       @Override
       public void dropAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("DROP TABLE IF EXISTS `workspaces`");
         db.execSQL("DROP TABLE IF EXISTS `expenses`");
+        db.execSQL("DROP TABLE IF EXISTS `grant_settings`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -142,9 +148,24 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
                   + " Expected:\n" + _infoExpenses + "\n"
                   + " Found:\n" + _existingExpenses);
         }
+        final HashMap<String, TableInfo.Column> _columnsGrantSettings = new HashMap<String, TableInfo.Column>(5);
+        _columnsGrantSettings.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGrantSettings.put("totalGrant", new TableInfo.Column("totalGrant", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGrantSettings.put("firestoreId", new TableInfo.Column("firestoreId", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGrantSettings.put("syncStatus", new TableInfo.Column("syncStatus", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGrantSettings.put("lastModified", new TableInfo.Column("lastModified", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysGrantSettings = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesGrantSettings = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoGrantSettings = new TableInfo("grant_settings", _columnsGrantSettings, _foreignKeysGrantSettings, _indicesGrantSettings);
+        final TableInfo _existingGrantSettings = TableInfo.read(db, "grant_settings");
+        if (!_infoGrantSettings.equals(_existingGrantSettings)) {
+          return new RoomOpenHelper.ValidationResult(false, "grant_settings(com.budget.manager.data.model.GrantSettings).\n"
+                  + " Expected:\n" + _infoGrantSettings + "\n"
+                  + " Found:\n" + _existingGrantSettings);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "d92bffcda70a3889e90936d441a9a96d", "84b868fb3bd39d2679a4504f74e70da5");
+    }, "1f56d941608522c1100aa4eb81d271d2", "af6c16f9e58c9b725154ccb2c5565680");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -155,7 +176,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "workspaces","expenses");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "workspaces","expenses","grant_settings");
   }
 
   @Override
@@ -173,6 +194,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
       }
       _db.execSQL("DELETE FROM `workspaces`");
       _db.execSQL("DELETE FROM `expenses`");
+      _db.execSQL("DELETE FROM `grant_settings`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -192,6 +214,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
     final HashMap<Class<?>, List<Class<?>>> _typeConvertersMap = new HashMap<Class<?>, List<Class<?>>>();
     _typeConvertersMap.put(WorkspaceDao.class, WorkspaceDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(ExpenseDao.class, ExpenseDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(GrantDao.class, GrantDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -234,6 +257,20 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
           _expenseDao = new ExpenseDao_Impl(this);
         }
         return _expenseDao;
+      }
+    }
+  }
+
+  @Override
+  public GrantDao grantDao() {
+    if (_grantDao != null) {
+      return _grantDao;
+    } else {
+      synchronized(this) {
+        if(_grantDao == null) {
+          _grantDao = new GrantDao_Impl(this);
+        }
+        return _grantDao;
       }
     }
   }
