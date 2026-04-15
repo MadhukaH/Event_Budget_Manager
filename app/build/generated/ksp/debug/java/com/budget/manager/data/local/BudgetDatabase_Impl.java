@@ -38,16 +38,16 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(3) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(4) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `workspaces` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `totalBudget` REAL NOT NULL, `createdAt` INTEGER NOT NULL, `colorIndex` INTEGER NOT NULL, `firestoreId` TEXT NOT NULL, `syncStatus` TEXT NOT NULL, `lastModified` INTEGER NOT NULL)");
-        db.execSQL("CREATE TABLE IF NOT EXISTS `expenses` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workspaceId` INTEGER NOT NULL, `category` TEXT NOT NULL, `amount` REAL NOT NULL, `note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `firestoreId` TEXT NOT NULL, `workspaceFirestoreId` TEXT NOT NULL, `syncStatus` TEXT NOT NULL, `lastModified` INTEGER NOT NULL, FOREIGN KEY(`workspaceId`) REFERENCES `workspaces`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `expenses` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workspaceId` INTEGER NOT NULL, `category` TEXT NOT NULL, `amount` REAL NOT NULL, `note` TEXT NOT NULL, `receiptBase64` TEXT, `createdAt` INTEGER NOT NULL, `firestoreId` TEXT NOT NULL, `workspaceFirestoreId` TEXT NOT NULL, `syncStatus` TEXT NOT NULL, `lastModified` INTEGER NOT NULL, FOREIGN KEY(`workspaceId`) REFERENCES `workspaces`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_workspaceId` ON `expenses` (`workspaceId`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_syncStatus` ON `expenses` (`syncStatus`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_firestoreId` ON `expenses` (`firestoreId`)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fba0543ab81be426511fb9439569708f')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd92bffcda70a3889e90936d441a9a96d')");
       }
 
       @Override
@@ -117,12 +117,13 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
                   + " Expected:\n" + _infoWorkspaces + "\n"
                   + " Found:\n" + _existingWorkspaces);
         }
-        final HashMap<String, TableInfo.Column> _columnsExpenses = new HashMap<String, TableInfo.Column>(10);
+        final HashMap<String, TableInfo.Column> _columnsExpenses = new HashMap<String, TableInfo.Column>(11);
         _columnsExpenses.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsExpenses.put("workspaceId", new TableInfo.Column("workspaceId", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsExpenses.put("category", new TableInfo.Column("category", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsExpenses.put("amount", new TableInfo.Column("amount", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsExpenses.put("note", new TableInfo.Column("note", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsExpenses.put("receiptBase64", new TableInfo.Column("receiptBase64", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsExpenses.put("createdAt", new TableInfo.Column("createdAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsExpenses.put("firestoreId", new TableInfo.Column("firestoreId", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsExpenses.put("workspaceFirestoreId", new TableInfo.Column("workspaceFirestoreId", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -143,7 +144,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "fba0543ab81be426511fb9439569708f", "5eafb6a5e8e38db3843db6cac890bdc1");
+    }, "d92bffcda70a3889e90936d441a9a96d", "84b868fb3bd39d2679a4504f74e70da5");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

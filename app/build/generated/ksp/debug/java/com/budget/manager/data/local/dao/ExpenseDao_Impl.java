@@ -60,7 +60,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `expenses` (`id`,`workspaceId`,`category`,`amount`,`note`,`createdAt`,`firestoreId`,`workspaceFirestoreId`,`syncStatus`,`lastModified`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `expenses` (`id`,`workspaceId`,`category`,`amount`,`note`,`receiptBase64`,`createdAt`,`firestoreId`,`workspaceFirestoreId`,`syncStatus`,`lastModified`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -71,12 +71,17 @@ public final class ExpenseDao_Impl implements ExpenseDao {
         statement.bindString(3, entity.getCategory());
         statement.bindDouble(4, entity.getAmount());
         statement.bindString(5, entity.getNote());
-        statement.bindLong(6, entity.getCreatedAt());
-        statement.bindString(7, entity.getFirestoreId());
-        statement.bindString(8, entity.getWorkspaceFirestoreId());
+        if (entity.getReceiptBase64() == null) {
+          statement.bindNull(6);
+        } else {
+          statement.bindString(6, entity.getReceiptBase64());
+        }
+        statement.bindLong(7, entity.getCreatedAt());
+        statement.bindString(8, entity.getFirestoreId());
+        statement.bindString(9, entity.getWorkspaceFirestoreId());
         final String _tmp = __syncStatusConverter.fromSyncStatus(entity.getSyncStatus());
-        statement.bindString(9, _tmp);
-        statement.bindLong(10, entity.getLastModified());
+        statement.bindString(10, _tmp);
+        statement.bindLong(11, entity.getLastModified());
       }
     };
     this.__deletionAdapterOfExpense = new EntityDeletionOrUpdateAdapter<Expense>(__db) {
@@ -96,7 +101,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "UPDATE OR ABORT `expenses` SET `id` = ?,`workspaceId` = ?,`category` = ?,`amount` = ?,`note` = ?,`createdAt` = ?,`firestoreId` = ?,`workspaceFirestoreId` = ?,`syncStatus` = ?,`lastModified` = ? WHERE `id` = ?";
+        return "UPDATE OR ABORT `expenses` SET `id` = ?,`workspaceId` = ?,`category` = ?,`amount` = ?,`note` = ?,`receiptBase64` = ?,`createdAt` = ?,`firestoreId` = ?,`workspaceFirestoreId` = ?,`syncStatus` = ?,`lastModified` = ? WHERE `id` = ?";
       }
 
       @Override
@@ -107,13 +112,18 @@ public final class ExpenseDao_Impl implements ExpenseDao {
         statement.bindString(3, entity.getCategory());
         statement.bindDouble(4, entity.getAmount());
         statement.bindString(5, entity.getNote());
-        statement.bindLong(6, entity.getCreatedAt());
-        statement.bindString(7, entity.getFirestoreId());
-        statement.bindString(8, entity.getWorkspaceFirestoreId());
+        if (entity.getReceiptBase64() == null) {
+          statement.bindNull(6);
+        } else {
+          statement.bindString(6, entity.getReceiptBase64());
+        }
+        statement.bindLong(7, entity.getCreatedAt());
+        statement.bindString(8, entity.getFirestoreId());
+        statement.bindString(9, entity.getWorkspaceFirestoreId());
         final String _tmp = __syncStatusConverter.fromSyncStatus(entity.getSyncStatus());
-        statement.bindString(9, _tmp);
-        statement.bindLong(10, entity.getLastModified());
-        statement.bindLong(11, entity.getId());
+        statement.bindString(10, _tmp);
+        statement.bindLong(11, entity.getLastModified());
+        statement.bindLong(12, entity.getId());
       }
     };
     this.__preparedStmtOfDeleteAllExpensesByWorkspace = new SharedSQLiteStatement(__db) {
@@ -323,6 +333,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
           final int _cursorIndexOfCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "category");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
+          final int _cursorIndexOfReceiptBase64 = CursorUtil.getColumnIndexOrThrow(_cursor, "receiptBase64");
           final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
           final int _cursorIndexOfFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "firestoreId");
           final int _cursorIndexOfWorkspaceFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceFirestoreId");
@@ -341,6 +352,12 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
             final String _tmpNote;
             _tmpNote = _cursor.getString(_cursorIndexOfNote);
+            final String _tmpReceiptBase64;
+            if (_cursor.isNull(_cursorIndexOfReceiptBase64)) {
+              _tmpReceiptBase64 = null;
+            } else {
+              _tmpReceiptBase64 = _cursor.getString(_cursorIndexOfReceiptBase64);
+            }
             final long _tmpCreatedAt;
             _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
             final String _tmpFirestoreId;
@@ -353,7 +370,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpSyncStatus = __syncStatusConverter.toSyncStatus(_tmp);
             final long _tmpLastModified;
             _tmpLastModified = _cursor.getLong(_cursorIndexOfLastModified);
-            _item = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
+            _item = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpReceiptBase64,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
             _result.add(_item);
           }
           return _result;
@@ -387,6 +404,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
           final int _cursorIndexOfCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "category");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
+          final int _cursorIndexOfReceiptBase64 = CursorUtil.getColumnIndexOrThrow(_cursor, "receiptBase64");
           final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
           final int _cursorIndexOfFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "firestoreId");
           final int _cursorIndexOfWorkspaceFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceFirestoreId");
@@ -404,6 +422,12 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
             final String _tmpNote;
             _tmpNote = _cursor.getString(_cursorIndexOfNote);
+            final String _tmpReceiptBase64;
+            if (_cursor.isNull(_cursorIndexOfReceiptBase64)) {
+              _tmpReceiptBase64 = null;
+            } else {
+              _tmpReceiptBase64 = _cursor.getString(_cursorIndexOfReceiptBase64);
+            }
             final long _tmpCreatedAt;
             _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
             final String _tmpFirestoreId;
@@ -416,7 +440,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpSyncStatus = __syncStatusConverter.toSyncStatus(_tmp);
             final long _tmpLastModified;
             _tmpLastModified = _cursor.getLong(_cursorIndexOfLastModified);
-            _result = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
+            _result = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpReceiptBase64,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
           } else {
             _result = null;
           }
@@ -448,6 +472,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
           final int _cursorIndexOfCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "category");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
+          final int _cursorIndexOfReceiptBase64 = CursorUtil.getColumnIndexOrThrow(_cursor, "receiptBase64");
           final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
           final int _cursorIndexOfFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "firestoreId");
           final int _cursorIndexOfWorkspaceFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceFirestoreId");
@@ -465,6 +490,12 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
             final String _tmpNote;
             _tmpNote = _cursor.getString(_cursorIndexOfNote);
+            final String _tmpReceiptBase64;
+            if (_cursor.isNull(_cursorIndexOfReceiptBase64)) {
+              _tmpReceiptBase64 = null;
+            } else {
+              _tmpReceiptBase64 = _cursor.getString(_cursorIndexOfReceiptBase64);
+            }
             final long _tmpCreatedAt;
             _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
             final String _tmpFirestoreId;
@@ -477,7 +508,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpSyncStatus = __syncStatusConverter.toSyncStatus(_tmp);
             final long _tmpLastModified;
             _tmpLastModified = _cursor.getLong(_cursorIndexOfLastModified);
-            _result = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
+            _result = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpReceiptBase64,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
           } else {
             _result = null;
           }
@@ -580,6 +611,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
           final int _cursorIndexOfCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "category");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
+          final int _cursorIndexOfReceiptBase64 = CursorUtil.getColumnIndexOrThrow(_cursor, "receiptBase64");
           final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
           final int _cursorIndexOfFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "firestoreId");
           final int _cursorIndexOfWorkspaceFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceFirestoreId");
@@ -598,6 +630,12 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
             final String _tmpNote;
             _tmpNote = _cursor.getString(_cursorIndexOfNote);
+            final String _tmpReceiptBase64;
+            if (_cursor.isNull(_cursorIndexOfReceiptBase64)) {
+              _tmpReceiptBase64 = null;
+            } else {
+              _tmpReceiptBase64 = _cursor.getString(_cursorIndexOfReceiptBase64);
+            }
             final long _tmpCreatedAt;
             _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
             final String _tmpFirestoreId;
@@ -610,7 +648,7 @@ public final class ExpenseDao_Impl implements ExpenseDao {
             _tmpSyncStatus = __syncStatusConverter.toSyncStatus(_tmp);
             final long _tmpLastModified;
             _tmpLastModified = _cursor.getLong(_cursorIndexOfLastModified);
-            _item = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
+            _item = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpReceiptBase64,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
             _result.add(_item);
           }
           return _result;

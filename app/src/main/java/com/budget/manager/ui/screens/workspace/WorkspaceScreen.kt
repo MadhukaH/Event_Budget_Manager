@@ -335,6 +335,25 @@ fun ExpenseListItem(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (!expense.receiptBase64.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Attachment,
+                            contentDescription = "Has Receipt",
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Receipt Attached",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Text(
                     text = dateFormat.format(Date(expense.createdAt)),
                     style = MaterialTheme.typography.labelSmall,

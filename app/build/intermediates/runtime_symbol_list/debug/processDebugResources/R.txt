@@ -517,5 +517,6 @@ int[] styleable SignInButton { 0x7f030003, 0x7f030005, 0x7f030028 }
 int styleable SignInButton_buttonSize 0
 int styleable SignInButton_colorScheme 1
 int styleable SignInButton_scopeUris 2
+int xml file_paths 0x7f100002
 int xml ga_ad_services_config 0x7f100000
 int xml image_share_filepaths 0x7f100001

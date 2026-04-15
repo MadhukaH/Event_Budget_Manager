@@ -28,3 +28,4 @@ string total_spent
 string workspace
 string workspaces
 style Theme.Budget
+xml file_paths

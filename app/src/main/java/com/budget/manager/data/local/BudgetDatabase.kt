@@ -20,7 +20,7 @@ class SyncStatusConverter {
 
 @Database(
     entities = [Workspace::class, Expense::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(SyncStatusConverter::class)

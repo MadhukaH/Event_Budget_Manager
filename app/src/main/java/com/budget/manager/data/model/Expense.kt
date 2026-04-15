@@ -40,6 +40,7 @@ data class Expense(
     val category: String,
     val amount: Double,
     val note: String = "",
+    val receiptBase64: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
 
     // ── Sync metadata ──────────────────────────────────────────────────────

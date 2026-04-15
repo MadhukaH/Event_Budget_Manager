@@ -438,5 +438,6 @@ styleable NavHost navGraph
 styleable NavInclude graph
 styleable Navigator android_label android_id route
 styleable SignInButton buttonSize colorScheme scopeUris
+xml file_paths
 xml ga_ad_services_config
 xml image_share_filepaths

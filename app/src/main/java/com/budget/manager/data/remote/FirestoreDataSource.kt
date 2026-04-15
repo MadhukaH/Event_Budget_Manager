@@ -146,6 +146,7 @@ class FirestoreDataSource @Inject constructor(
                         category = doc.getString("category") ?: "",
                         amount = doc.getDouble("amount") ?: 0.0,
                         note = doc.getString("note") ?: "",
+                        receiptBase64 = doc.getString("receiptBase64"),
                         createdAt = doc.getLong("createdAt") ?: 0L,
                         lastModified = doc.getLong("lastModified") ?: 0L
                     )
@@ -168,14 +169,20 @@ private fun Workspace.toFirestoreMap(): Map<String, Any> = mapOf(
     "lastModified" to lastModified
 )
 
-private fun Expense.toFirestoreMap(): Map<String, Any> = mapOf(
-    "workspaceId" to workspaceFirestoreId,
-    "category" to category,
-    "amount" to amount,
-    "note" to note,
-    "createdAt" to createdAt,
-    "lastModified" to lastModified
-)
+private fun Expense.toFirestoreMap(): Map<String, Any> {
+    val map = mutableMapOf<String, Any>(
+        "workspaceId" to workspaceFirestoreId,
+        "category" to category,
+        "amount" to amount,
+        "note" to note,
+        "createdAt" to createdAt,
+        "lastModified" to lastModified
+    )
+    if (receiptBase64 != null) {
+        map["receiptBase64"] = receiptBase64
+    }
+    return map
+}
 
 // ── Remote DTOs ───────────────────────────────────────────────────────────────
 
@@ -195,6 +202,7 @@ data class RemoteExpense(
     val category: String = "",
     val amount: Double = 0.0,
     val note: String = "",
+    val receiptBase64: String? = null,
     val createdAt: Long = 0L,
     val lastModified: Long = 0L
 )

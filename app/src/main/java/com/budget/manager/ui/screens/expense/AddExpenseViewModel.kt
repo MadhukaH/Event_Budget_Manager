@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.budget.manager.data.model.Expense
 import com.budget.manager.data.repository.ExpenseRepository
+import com.budget.manager.util.ImageUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,6 +21,7 @@ data class AddExpenseUiState(
     val note: String = "",
     val isEditMode: Boolean = false,
     val isSaved: Boolean = false,
+    val receiptBase64: String? = null,
     val categoryError: Boolean = false,
     val amountError: Boolean = false,
     val isLoading: Boolean = false
@@ -53,6 +55,7 @@ class AddExpenseViewModel @Inject constructor(
                         selectedCategory = e.category,
                         amountText = e.amount.toString(),
                         note = e.note,
+                        receiptBase64 = e.receiptBase64,
                         isEditMode = true,
                         isLoading = false
                     )
@@ -71,6 +74,22 @@ class AddExpenseViewModel @Inject constructor(
 
     fun setNote(note: String) {
         _uiState.update { it.copy(note = note) }
+    }
+
+    /**
+     * Processes chosen/captured Images into heavily compressed Base64 Strings 
+     * on a background thread so the UI does not stutter.
+     */
+    fun onImageReceived(context: android.content.Context, uri: android.net.Uri?) {
+        if (uri == null) return
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val base64String = ImageUtils.uriToBase64(context, uri)
+            _uiState.update { it.copy(receiptBase64 = base64String) }
+        }
+    }
+
+    fun clearImage() {
+        _uiState.update { it.copy(receiptBase64 = null) }
     }
 
     fun saveExpense() {
@@ -96,7 +115,8 @@ class AddExpenseViewModel @Inject constructor(
                 workspaceId = workspaceId,
                 category = state.selectedCategory,
                 amount = amount!!,
-                note = state.note
+                note = state.note,
+                receiptBase64 = state.receiptBase64
             )
             expenseRepository.addExpense(expense)
             _uiState.update { it.copy(isSaved = true) }
