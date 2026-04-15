@@ -23,12 +23,12 @@ data class WorkspaceWithTotal(
 
 data class GrantState(
     val totalGrant: Double = 0.0,
-    val totalAllocated: Double = 0.0   // sum of all workspace budgets
+    val totalSpent: Double = 0.0
 ) {
-    val remaining: Double get() = totalGrant - totalAllocated
+    val remaining: Double get() = totalGrant - totalSpent
     val hasGrant: Boolean get() = totalGrant > 0.0
     val usagePercent: Float
-        get() = if (totalGrant > 0) (totalAllocated / totalGrant).coerceIn(0.0, 1.0).toFloat() else 0f
+        get() = if (totalGrant > 0) (totalSpent / totalGrant).coerceIn(0.0, 1.0).toFloat() else 0f
 }
 
 data class HomeUiState(
@@ -75,10 +75,10 @@ class HomeViewModel @Inject constructor(
                     },
                 grantRepository.getGrantSettings()
             ) { workspacesWithTotals, grant ->
-                val totalAllocated = workspacesWithTotals.sumOf { it.workspace.totalBudget }
+                val totalSpent = workspacesWithTotals.sumOf { it.totalSpent }
                 val grantState = GrantState(
                     totalGrant = grant?.totalGrant ?: 0.0,
-                    totalAllocated = totalAllocated
+                    totalSpent = totalSpent
                 )
                 Pair(workspacesWithTotals, grantState)
             }

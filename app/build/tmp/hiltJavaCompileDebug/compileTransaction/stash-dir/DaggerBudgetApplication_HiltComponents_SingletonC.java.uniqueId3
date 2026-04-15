@@ -15,14 +15,17 @@ import androidx.work.WorkManager;
 import androidx.work.WorkerParameters;
 import com.budget.manager.data.local.BudgetDatabase;
 import com.budget.manager.data.local.dao.ExpenseDao;
+import com.budget.manager.data.local.dao.GrantDao;
 import com.budget.manager.data.local.dao.WorkspaceDao;
 import com.budget.manager.data.remote.FirestoreDataSource;
 import com.budget.manager.data.repository.ExpenseRepository;
+import com.budget.manager.data.repository.GrantRepository;
 import com.budget.manager.data.repository.WorkspaceRepository;
 import com.budget.manager.data.sync.SyncManager;
 import com.budget.manager.di.AppModule_ProvideBudgetDatabaseFactory;
 import com.budget.manager.di.AppModule_ProvideExpenseDaoFactory;
 import com.budget.manager.di.AppModule_ProvideFirebaseFirestoreFactory;
+import com.budget.manager.di.AppModule_ProvideGrantDaoFactory;
 import com.budget.manager.di.AppModule_ProvideWorkManagerFactory;
 import com.budget.manager.di.AppModule_ProvideWorkspaceDaoFactory;
 import com.budget.manager.ui.screens.dashboard.DashboardViewModel;
@@ -500,7 +503,7 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
           return (T) new DashboardViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), viewModelCImpl.savedStateHandle);
 
           case 2: // com.budget.manager.ui.screens.home.HomeViewModel 
-          return (T) new HomeViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), singletonCImpl.networkObserverProvider.get(), singletonCImpl.provideWorkManagerProvider.get());
+          return (T) new HomeViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), singletonCImpl.grantRepositoryProvider.get(), singletonCImpl.networkObserverProvider.get(), singletonCImpl.provideWorkManagerProvider.get());
 
           case 3: // com.budget.manager.ui.screens.workspace.WorkspaceViewModel 
           return (T) new WorkspaceViewModel(singletonCImpl.workspaceRepositoryProvider.get(), singletonCImpl.expenseRepositoryProvider.get(), viewModelCImpl.savedStateHandle, singletonCImpl.provideWorkManagerProvider.get(), singletonCImpl.networkObserverProvider.get());
@@ -591,6 +594,8 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
 
     private Provider<ExpenseDao> provideExpenseDaoProvider;
 
+    private Provider<GrantDao> provideGrantDaoProvider;
+
     private Provider<FirebaseFirestore> provideFirebaseFirestoreProvider;
 
     private Provider<FirestoreDataSource> firestoreDataSourceProvider;
@@ -606,6 +611,8 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
     private Provider<ExpenseRepository> expenseRepositoryProvider;
 
     private Provider<WorkspaceRepository> workspaceRepositoryProvider;
+
+    private Provider<GrantRepository> grantRepositoryProvider;
 
     private SingletonCImpl(ApplicationContextModule applicationContextModuleParam) {
       this.applicationContextModule = applicationContextModuleParam;
@@ -627,14 +634,16 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
       this.provideBudgetDatabaseProvider = DoubleCheck.provider(new SwitchingProvider<BudgetDatabase>(singletonCImpl, 3));
       this.provideWorkspaceDaoProvider = DoubleCheck.provider(new SwitchingProvider<WorkspaceDao>(singletonCImpl, 2));
       this.provideExpenseDaoProvider = DoubleCheck.provider(new SwitchingProvider<ExpenseDao>(singletonCImpl, 4));
-      this.provideFirebaseFirestoreProvider = DoubleCheck.provider(new SwitchingProvider<FirebaseFirestore>(singletonCImpl, 6));
-      this.firestoreDataSourceProvider = DoubleCheck.provider(new SwitchingProvider<FirestoreDataSource>(singletonCImpl, 5));
-      this.networkObserverProvider = DoubleCheck.provider(new SwitchingProvider<NetworkObserver>(singletonCImpl, 7));
+      this.provideGrantDaoProvider = DoubleCheck.provider(new SwitchingProvider<GrantDao>(singletonCImpl, 5));
+      this.provideFirebaseFirestoreProvider = DoubleCheck.provider(new SwitchingProvider<FirebaseFirestore>(singletonCImpl, 7));
+      this.firestoreDataSourceProvider = DoubleCheck.provider(new SwitchingProvider<FirestoreDataSource>(singletonCImpl, 6));
+      this.networkObserverProvider = DoubleCheck.provider(new SwitchingProvider<NetworkObserver>(singletonCImpl, 8));
       this.syncManagerProvider = DoubleCheck.provider(new SwitchingProvider<SyncManager>(singletonCImpl, 1));
       this.budgetSyncWorker_AssistedFactoryProvider = SingleCheck.provider(new SwitchingProvider<BudgetSyncWorker_AssistedFactory>(singletonCImpl, 0));
-      this.provideWorkManagerProvider = DoubleCheck.provider(new SwitchingProvider<WorkManager>(singletonCImpl, 8));
-      this.expenseRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<ExpenseRepository>(singletonCImpl, 9));
-      this.workspaceRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<WorkspaceRepository>(singletonCImpl, 10));
+      this.provideWorkManagerProvider = DoubleCheck.provider(new SwitchingProvider<WorkManager>(singletonCImpl, 9));
+      this.expenseRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<ExpenseRepository>(singletonCImpl, 10));
+      this.workspaceRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<WorkspaceRepository>(singletonCImpl, 11));
+      this.grantRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<GrantRepository>(singletonCImpl, 12));
     }
 
     @Override
@@ -687,7 +696,7 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
           };
 
           case 1: // com.budget.manager.data.sync.SyncManager 
-          return (T) new SyncManager(singletonCImpl.provideWorkspaceDaoProvider.get(), singletonCImpl.provideExpenseDaoProvider.get(), singletonCImpl.firestoreDataSourceProvider.get(), singletonCImpl.networkObserverProvider.get());
+          return (T) new SyncManager(singletonCImpl.provideWorkspaceDaoProvider.get(), singletonCImpl.provideExpenseDaoProvider.get(), singletonCImpl.provideGrantDaoProvider.get(), singletonCImpl.firestoreDataSourceProvider.get(), singletonCImpl.networkObserverProvider.get());
 
           case 2: // com.budget.manager.data.local.dao.WorkspaceDao 
           return (T) AppModule_ProvideWorkspaceDaoFactory.provideWorkspaceDao(singletonCImpl.provideBudgetDatabaseProvider.get());
@@ -698,23 +707,29 @@ public final class DaggerBudgetApplication_HiltComponents_SingletonC {
           case 4: // com.budget.manager.data.local.dao.ExpenseDao 
           return (T) AppModule_ProvideExpenseDaoFactory.provideExpenseDao(singletonCImpl.provideBudgetDatabaseProvider.get());
 
-          case 5: // com.budget.manager.data.remote.FirestoreDataSource 
+          case 5: // com.budget.manager.data.local.dao.GrantDao 
+          return (T) AppModule_ProvideGrantDaoFactory.provideGrantDao(singletonCImpl.provideBudgetDatabaseProvider.get());
+
+          case 6: // com.budget.manager.data.remote.FirestoreDataSource 
           return (T) new FirestoreDataSource(singletonCImpl.provideFirebaseFirestoreProvider.get());
 
-          case 6: // com.google.firebase.firestore.FirebaseFirestore 
+          case 7: // com.google.firebase.firestore.FirebaseFirestore 
           return (T) AppModule_ProvideFirebaseFirestoreFactory.provideFirebaseFirestore();
 
-          case 7: // com.budget.manager.util.NetworkObserver 
+          case 8: // com.budget.manager.util.NetworkObserver 
           return (T) new NetworkObserver(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
-          case 8: // androidx.work.WorkManager 
+          case 9: // androidx.work.WorkManager 
           return (T) AppModule_ProvideWorkManagerFactory.provideWorkManager(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
-          case 9: // com.budget.manager.data.repository.ExpenseRepository 
+          case 10: // com.budget.manager.data.repository.ExpenseRepository 
           return (T) new ExpenseRepository(singletonCImpl.provideExpenseDaoProvider.get());
 
-          case 10: // com.budget.manager.data.repository.WorkspaceRepository 
+          case 11: // com.budget.manager.data.repository.WorkspaceRepository 
           return (T) new WorkspaceRepository(singletonCImpl.provideWorkspaceDaoProvider.get(), singletonCImpl.networkObserverProvider.get());
+
+          case 12: // com.budget.manager.data.repository.GrantRepository 
+          return (T) new GrantRepository(singletonCImpl.provideGrantDaoProvider.get());
 
           default: throw new AssertionError(id);
         }

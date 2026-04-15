@@ -12,6 +12,9 @@ import com.budget.manager.data.remote.RemoteExpense
 import com.budget.manager.data.remote.RemoteWorkspace
 import com.budget.manager.util.NetworkObserver
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,6 +43,8 @@ class SyncManager @Inject constructor(
     private val networkObserver: NetworkObserver
 ) {
 
+    private val syncMutex = Mutex()
+
     /**
      * Full bidirectional sync. Safe to call multiple times — idempotent.
      * Returns [SyncResult] indicating success or failure with details.
@@ -50,8 +55,9 @@ class SyncManager @Inject constructor(
             return@withContext SyncResult.NoNetwork
         }
 
-        return@withContext try {
-            Log.d(TAG, "syncAll: starting full sync")
+        syncMutex.withLock {
+            return@withContext try {
+                Log.d(TAG, "syncAll: starting full sync")
 
             // Step 1: Push local workspace changes to Firestore
             syncWorkspacesToFirestore()
@@ -68,11 +74,15 @@ class SyncManager @Inject constructor(
             // Step 5: Pull Firestore expenses → Room (for each synced workspace)
             pullExpensesFromFirestore()
 
+            // Step 6: Pull global grant money settings → Room
+            pullGrantMoneyFromFirestore()
+
             Log.d(TAG, "syncAll: completed successfully")
             SyncResult.Success
         } catch (e: Exception) {
             Log.e(TAG, "syncAll: failed", e)
             SyncResult.Error(e.message ?: "Unknown sync error")
+        }
         }
     }
 
@@ -183,20 +193,39 @@ class SyncManager @Inject constructor(
     }
 
     private suspend fun pullExpensesFromFirestore() {
-        // Only pull for workspaces that are already synced (have a firestoreId)
-        val syncedWorkspaces = workspaceDao.getPendingSyncWorkspaces()
-            .filter { it.syncStatus == SyncStatus.SYNCED && it.firestoreId.isNotBlank() }
-            .plus(
-                // Also include workspaces that were just synced in this session
-                emptyList<Workspace>() // Additional logic can be added here
-            )
+        val workspaces = workspaceDao.getPendingSyncWorkspaces()
+            .plus(workspaceDao.getAllWorkspaces().firstOrNull() ?: emptyList())
+            .distinctBy { it.firestoreId }
+            .filter { it.firestoreId.isNotBlank() }
 
-        // Simplified: get all workspaces and pull expenses for each synced one
-        Log.d(TAG, "Pulling expenses from Firestore for synced workspaces")
+        Log.d(TAG, "Pulling expenses from Firestore for ${workspaces.size} workspaces")
 
-        // We query all expenses for workspaces that have Firestore IDs
-        // This is driven by the getWorkspaceByFirestoreId queries
-        // A more complete implementation would track all workspaceFirestoreIds
+        for (workspace in workspaces) {
+            try {
+                val remoteExpenses = firestoreDataSource.getExpensesForWorkspace(workspace.firestoreId)
+                for (remote in remoteExpenses) {
+                    val existing = expenseDao.getExpenseByFirestoreId(remote.firestoreId)
+                    if (existing == null) {
+                        expenseDao.insertExpense(remote.toExpense(workspace.id))
+                        Log.d(TAG, "  ✓ New expense pulled: ${remote.category}")
+                    } else if (remote.lastModified > existing.lastModified) {
+                        expenseDao.updateExpense(
+                            existing.copy(
+                                category = remote.category,
+                                amount = remote.amount,
+                                note = remote.note,
+                                receiptBase64 = remote.receiptBase64,
+                                lastModified = remote.lastModified,
+                                syncStatus = SyncStatus.SYNCED
+                            )
+                        )
+                        Log.d(TAG, "  ✓ Expense updated from remote: ${remote.category}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "  ✗ Failed to pull expenses for workspace ${workspace.firestoreId}: ${e.message}")
+            }
+        }
     }
 
     private suspend fun syncGrantToFirestore() {
@@ -211,19 +240,43 @@ class SyncManager @Inject constructor(
         }
     }
 
+    private suspend fun pullGrantMoneyFromFirestore() {
+        Log.d(TAG, "Pulling grant money from Firestore")
+        try {
+            val remoteGrant = firestoreDataSource.fetchGrantMoney() ?: return
+            val localGrant = grantDao.getGrantSettingsOnce()
+            
+            if (localGrant == null || remoteGrant > localGrant.totalGrant || (localGrant.syncStatus == SyncStatus.SYNCED && localGrant.totalGrant != remoteGrant)) {
+                // If local is null OR remote has a grant that was updated (we simplify by just taking the remote one if different and not pending local changes)
+                // Actually safer to trust remote completely if lastModified is newer, but fetchGrantMoney only returns Double.
+                // Let's rely on standard upsert:
+                val updated = (localGrant ?: com.budget.manager.data.model.GrantSettings()).copy(
+                    totalGrant = remoteGrant,
+                    syncStatus = SyncStatus.SYNCED
+                )
+                grantDao.upsertGrant(updated)
+                Log.d(TAG, "  ✓ Grant pulled from remote: $remoteGrant")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "  ✗ Failed to pull grant: ${e.message}")
+        }
+    }
+
     /**
      * Lightweight sync — only push pending local changes.
      * Used when online status is detected mid-session.
      */
     suspend fun syncPendingOnly(): SyncResult = withContext(Dispatchers.IO) {
         if (!networkObserver.isCurrentlyConnected()) return@withContext SyncResult.NoNetwork
-        return@withContext try {
-            syncWorkspacesToFirestore()
-            syncExpensesToFirestore()
-            syncGrantToFirestore()
-            SyncResult.Success
-        } catch (e: Exception) {
-            SyncResult.Error(e.message ?: "Sync failed")
+        syncMutex.withLock {
+            return@withContext try {
+                syncWorkspacesToFirestore()
+                syncExpensesToFirestore()
+                syncGrantToFirestore()
+                SyncResult.Success
+            } catch (e: Exception) {
+                SyncResult.Error(e.message ?: "Sync failed")
+            }
         }
     }
 }
@@ -237,6 +290,19 @@ private fun RemoteWorkspace.toWorkspace() = Workspace(
     colorIndex = colorIndex,
     createdAt = createdAt,
     firestoreId = firestoreId,
+    syncStatus = SyncStatus.SYNCED,
+    lastModified = lastModified
+)
+
+private fun RemoteExpense.toExpense(localWorkspaceId: Long) = Expense(
+    workspaceId = localWorkspaceId,
+    category = category,
+    amount = amount,
+    note = note,
+    receiptBase64 = receiptBase64,
+    createdAt = createdAt,
+    firestoreId = firestoreId,
+    workspaceFirestoreId = workspaceFirestoreId,
     syncStatus = SyncStatus.SYNCED,
     lastModified = lastModified
 )

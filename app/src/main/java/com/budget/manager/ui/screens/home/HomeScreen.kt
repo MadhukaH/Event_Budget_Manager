@@ -347,7 +347,7 @@ fun GrantWalletCard(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                "Allocated to Workspaces",
+                                "Spent from Grant",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                             )
@@ -371,7 +371,7 @@ fun GrantWalletCard(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "${formatCurrency(grantState.totalAllocated)} distributed across workspaces",
+                            text = "${formatCurrency(grantState.totalSpent)} spent across workspaces",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                         )
