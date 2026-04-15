@@ -2,7 +2,9 @@ package com.budget.manager.data.repository
 
 import com.budget.manager.data.local.dao.CategoryTotal
 import com.budget.manager.data.local.dao.ExpenseDao
+import com.budget.manager.data.local.dao.ExpenseCategoryDao
 import com.budget.manager.data.model.Expense
+import com.budget.manager.data.model.ExpenseCategory
 import com.budget.manager.data.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -17,8 +19,15 @@ import javax.inject.Singleton
  */
 @Singleton
 class ExpenseRepository @Inject constructor(
-    private val expenseDao: ExpenseDao
+    private val expenseDao: ExpenseDao,
+    private val expenseCategoryDao: ExpenseCategoryDao
 ) {
+    fun getAllCategories(): Flow<List<ExpenseCategory>> = expenseCategoryDao.getAllCategories()
+
+    suspend fun addCategory(categoryName: String) {
+        expenseCategoryDao.insertCategory(ExpenseCategory(name = categoryName))
+    }
+
     // ─── Reads ────────────────────────────────────────────────────────────────
 
     fun getExpensesByWorkspace(workspaceId: Long): Flow<List<Expense>> =

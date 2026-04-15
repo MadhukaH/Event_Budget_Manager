@@ -11,6 +11,8 @@ import androidx.room.util.DBUtil;
 import androidx.room.util.TableInfo;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 import androidx.sqlite.db.SupportSQLiteOpenHelper;
+import com.budget.manager.data.local.dao.ExpenseCategoryDao;
+import com.budget.manager.data.local.dao.ExpenseCategoryDao_Impl;
 import com.budget.manager.data.local.dao.ExpenseDao;
 import com.budget.manager.data.local.dao.ExpenseDao_Impl;
 import com.budget.manager.data.local.dao.GrantDao;
@@ -39,10 +41,12 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
 
   private volatile GrantDao _grantDao;
 
+  private volatile ExpenseCategoryDao _expenseCategoryDao;
+
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(5) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(6) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `workspaces` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `totalBudget` REAL NOT NULL, `createdAt` INTEGER NOT NULL, `colorIndex` INTEGER NOT NULL, `firestoreId` TEXT NOT NULL, `syncStatus` TEXT NOT NULL, `lastModified` INTEGER NOT NULL)");
@@ -51,8 +55,9 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_syncStatus` ON `expenses` (`syncStatus`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expenses_firestoreId` ON `expenses` (`firestoreId`)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `grant_settings` (`id` INTEGER NOT NULL, `totalGrant` REAL NOT NULL, `firestoreId` TEXT NOT NULL, `syncStatus` TEXT NOT NULL, `lastModified` INTEGER NOT NULL, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `custom_categories` (`name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`name`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1f56d941608522c1100aa4eb81d271d2')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '053c16d3549a9541ff9107f2354a7d45')");
       }
 
       @Override
@@ -60,6 +65,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
         db.execSQL("DROP TABLE IF EXISTS `workspaces`");
         db.execSQL("DROP TABLE IF EXISTS `expenses`");
         db.execSQL("DROP TABLE IF EXISTS `grant_settings`");
+        db.execSQL("DROP TABLE IF EXISTS `custom_categories`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -163,9 +169,21 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
                   + " Expected:\n" + _infoGrantSettings + "\n"
                   + " Found:\n" + _existingGrantSettings);
         }
+        final HashMap<String, TableInfo.Column> _columnsCustomCategories = new HashMap<String, TableInfo.Column>(2);
+        _columnsCustomCategories.put("name", new TableInfo.Column("name", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsCustomCategories.put("createdAt", new TableInfo.Column("createdAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysCustomCategories = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesCustomCategories = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoCustomCategories = new TableInfo("custom_categories", _columnsCustomCategories, _foreignKeysCustomCategories, _indicesCustomCategories);
+        final TableInfo _existingCustomCategories = TableInfo.read(db, "custom_categories");
+        if (!_infoCustomCategories.equals(_existingCustomCategories)) {
+          return new RoomOpenHelper.ValidationResult(false, "custom_categories(com.budget.manager.data.model.ExpenseCategory).\n"
+                  + " Expected:\n" + _infoCustomCategories + "\n"
+                  + " Found:\n" + _existingCustomCategories);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "1f56d941608522c1100aa4eb81d271d2", "af6c16f9e58c9b725154ccb2c5565680");
+    }, "053c16d3549a9541ff9107f2354a7d45", "d24e1a381abfadb25e6aae351966b1cd");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -176,7 +194,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "workspaces","expenses","grant_settings");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "workspaces","expenses","grant_settings","custom_categories");
   }
 
   @Override
@@ -195,6 +213,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
       _db.execSQL("DELETE FROM `workspaces`");
       _db.execSQL("DELETE FROM `expenses`");
       _db.execSQL("DELETE FROM `grant_settings`");
+      _db.execSQL("DELETE FROM `custom_categories`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -215,6 +234,7 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
     _typeConvertersMap.put(WorkspaceDao.class, WorkspaceDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(ExpenseDao.class, ExpenseDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(GrantDao.class, GrantDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(ExpenseCategoryDao.class, ExpenseCategoryDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -271,6 +291,20 @@ public final class BudgetDatabase_Impl extends BudgetDatabase {
           _grantDao = new GrantDao_Impl(this);
         }
         return _grantDao;
+      }
+    }
+  }
+
+  @Override
+  public ExpenseCategoryDao expenseCategoryDao() {
+    if (_expenseCategoryDao != null) {
+      return _expenseCategoryDao;
+    } else {
+      synchronized(this) {
+        if(_expenseCategoryDao == null) {
+          _expenseCategoryDao = new ExpenseCategoryDao_Impl(this);
+        }
+        return _expenseCategoryDao;
       }
     }
   }

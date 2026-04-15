@@ -2,9 +2,12 @@ package com.budget.manager.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.work.WorkManager
 import com.budget.manager.data.local.BudgetDatabase
 import com.budget.manager.data.local.dao.ExpenseDao
+import com.budget.manager.data.local.dao.ExpenseCategoryDao
 import com.budget.manager.data.local.dao.GrantDao
 import com.budget.manager.data.local.dao.WorkspaceDao
 import com.google.firebase.firestore.FirebaseFirestore
@@ -26,11 +29,18 @@ object AppModule {
     @Provides
     @Singleton
     fun provideBudgetDatabase(@ApplicationContext context: Context): BudgetDatabase {
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `custom_categories` (`name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`name`))")
+            }
+        }
+
         return Room.databaseBuilder(
             context,
             BudgetDatabase::class.java,
             BudgetDatabase.DATABASE_NAME
         )
+            .addMigrations(MIGRATION_5_6)
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -46,6 +56,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideGrantDao(database: BudgetDatabase): GrantDao = database.grantDao()
+
+    @Provides
+    @Singleton
+    fun provideExpenseCategoryDao(database: BudgetDatabase): ExpenseCategoryDao = database.expenseCategoryDao()
 
     // ─── Firebase Firestore ───────────────────────────────────────────────────
 

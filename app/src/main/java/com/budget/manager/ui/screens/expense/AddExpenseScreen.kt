@@ -82,6 +82,7 @@ fun AddExpenseScreen(
     viewModel: AddExpenseViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val customCategories by viewModel.customCategories.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -330,8 +331,13 @@ fun AddExpenseScreen(
     // Category bottom sheet
     if (showCategorySheet) {
         CategoryPickerSheet(
+            customCategories = customCategories,
             onCategorySelected = {
                 viewModel.setCategory(it)
+                showCategorySheet = false
+            },
+            onAddCustomCategory = { newCategory ->
+                viewModel.addCustomCategory(newCategory)
                 showCategorySheet = false
             },
             onDismiss = { showCategorySheet = false }
@@ -342,13 +348,49 @@ fun AddExpenseScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryPickerSheet(
+    customCategories: List<String>,
     onCategorySelected: (String) -> Unit,
+    onAddCustomCategory: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val filteredCategories = remember(searchQuery) {
-        if (searchQuery.isBlank()) BUDGET_CATEGORIES
-        else BUDGET_CATEGORIES.filter { it.contains(searchQuery, ignoreCase = true) }
+    
+    val allCategories = remember(customCategories) {
+        (BUDGET_CATEGORIES + customCategories).distinct().sorted()
+    }
+    
+    val filteredCategories = remember(searchQuery, allCategories) {
+        if (searchQuery.isBlank()) allCategories
+        else allCategories.filter { it.contains(searchQuery, ignoreCase = true) }
+    }
+
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    if (showAddDialog) {
+        var newCatName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Add Category") },
+            text = {
+                OutlinedTextField(
+                    value = newCatName,
+                    onValueChange = { newCatName = it },
+                    placeholder = { Text("Category Name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newCatName.isNotBlank()) {
+                        onAddCustomCategory(newCatName.trim())
+                        showAddDialog = false
+                    }
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     ModalBottomSheet(
@@ -393,6 +435,21 @@ fun CategoryPickerSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (searchQuery.isBlank()) {
+                    item {
+                        CategoryChip(
+                            text = "+ Create New",
+                            onClick = { showAddDialog = true }
+                        )
+                    }
+                } else if (searchQuery.isNotBlank() && !allCategories.any { it.equals(searchQuery.trim(), ignoreCase = true) }) {
+                    item {
+                        CategoryChip(
+                            text = "+ Add \"$searchQuery\"",
+                            onClick = { onAddCustomCategory(searchQuery.trim()) }
+                        )
+                    }
+                }
                 items(filteredCategories) { category ->
                     CategoryChip(
                         text = category,

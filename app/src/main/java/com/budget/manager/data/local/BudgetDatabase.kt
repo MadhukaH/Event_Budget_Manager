@@ -5,9 +5,11 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.budget.manager.data.local.dao.ExpenseDao
+import com.budget.manager.data.local.dao.ExpenseCategoryDao
 import com.budget.manager.data.local.dao.GrantDao
 import com.budget.manager.data.local.dao.WorkspaceDao
 import com.budget.manager.data.model.Expense
+import com.budget.manager.data.model.ExpenseCategory
 import com.budget.manager.data.model.GrantSettings
 import com.budget.manager.data.model.SyncStatus
 import com.budget.manager.data.model.Workspace
@@ -21,8 +23,8 @@ class SyncStatusConverter {
 }
 
 @Database(
-    entities = [Workspace::class, Expense::class, GrantSettings::class],
-    version = 5,
+    entities = [Workspace::class, Expense::class, GrantSettings::class, ExpenseCategory::class],
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(SyncStatusConverter::class)
@@ -30,6 +32,7 @@ abstract class BudgetDatabase : RoomDatabase() {
     abstract fun workspaceDao(): WorkspaceDao
     abstract fun expenseDao(): ExpenseDao
     abstract fun grantDao(): GrantDao
+    abstract fun expenseCategoryDao(): ExpenseCategoryDao
 
     companion object {
         const val DATABASE_NAME = "budget_database"

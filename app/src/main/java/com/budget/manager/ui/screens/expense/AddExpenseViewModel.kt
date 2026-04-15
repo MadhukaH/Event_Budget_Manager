@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.budget.manager.data.model.Expense
+import com.budget.manager.data.model.ExpenseCategory
 import com.budget.manager.data.repository.ExpenseRepository
 import com.budget.manager.util.ImageUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +44,14 @@ class AddExpenseViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AddExpenseUiState())
     val uiState: StateFlow<AddExpenseUiState> = _uiState.asStateFlow()
 
+    val customCategories: StateFlow<List<String>> = expenseRepository.getAllCategories()
+        .map { list -> list.map { it.name } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     init {
         expenseId?.let { loadExpense(it) }
     }
@@ -69,6 +78,15 @@ class AddExpenseViewModel @Inject constructor(
 
     fun setCategory(category: String) {
         _uiState.update { it.copy(selectedCategory = category, categoryError = false) }
+    }
+
+    fun addCustomCategory(category: String) {
+        if (category.isNotBlank()) {
+            viewModelScope.launch {
+                expenseRepository.addCategory(category.trim())
+                setCategory(category.trim())
+            }
+        }
     }
 
     fun setAmount(amount: String) {
