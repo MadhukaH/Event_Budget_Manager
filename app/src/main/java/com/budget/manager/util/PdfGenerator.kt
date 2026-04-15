@@ -379,6 +379,51 @@ object PdfGenerator {
 
         pdfDocument.finishPage(page)
 
+        // --- Image Appendix ---
+        expenses.filter { !it.receiptBase64.isNullOrBlank() }.forEach { expense ->
+            try {
+                val decodedBytes = android.util.Base64.decode(expense.receiptBase64, android.util.Base64.DEFAULT)
+                val bitmap = android.graphics.BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                
+                if (bitmap != null) {
+                    val AppendixPageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, 1).create()
+                    val aPage = pdfDocument.startPage(AppendixPageInfo)
+                    val aCanvas = aPage.canvas
+                    var aY = MARGIN
+
+                    // Header
+                    aCanvas.drawText("Attachment for: ${expense.category}", MARGIN, aY, titlePaint)
+                    aY += 30f
+
+                    val cleanTitle = expense.note.replace('\n', ' ')
+                    aCanvas.drawText("Note: $cleanTitle", MARGIN, aY, subtitlePaint)
+                    aY += 25f
+
+                    aCanvas.drawText("Amount: Rs " + formatter.format(expense.amount), MARGIN, aY, subtitlePaint)
+                    aY += 40f
+
+                    // Draw image scaled
+                    val maxW = PAGE_WIDTH.toFloat() - (2 * MARGIN)
+                    val maxH = PAGE_HEIGHT.toFloat() - aY - MARGIN
+
+                    val ratioX = maxW / bitmap.width
+                    val ratioY = maxH / bitmap.height
+                    val minRatio = minOf(ratioX, ratioY, 1f) 
+
+                    val newW = bitmap.width * minRatio
+                    val newH = bitmap.height * minRatio
+
+                    val destRect = RectF(MARGIN, aY, MARGIN + newW, aY + newH)
+                    aCanvas.drawBitmap(bitmap, null, destRect, null)
+                    
+                    bitmap.recycle()
+                    pdfDocument.finishPage(aPage)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
         return try {
             val outputDir = File(context.cacheDir, "pdfs")
             if (!outputDir.exists()) outputDir.mkdirs()
