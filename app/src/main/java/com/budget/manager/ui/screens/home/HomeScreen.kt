@@ -29,6 +29,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.budget.manager.util.PdfGenerator
 import com.budget.manager.data.model.SyncStatus
 import com.budget.manager.data.model.Workspace
 import com.budget.manager.ui.components.DeleteConfirmationDialog
@@ -49,6 +55,9 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isGeneratingPdf by remember { mutableStateOf(false) }
     var workspaceToDelete by remember { mutableStateOf<Workspace?>(null) }
 
     Scaffold(
@@ -85,6 +94,41 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    if (isGeneratingPdf) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(onClick = {
+                            isGeneratingPdf = true
+                            scope.launch(Dispatchers.IO) {
+                                val expenses = viewModel.getAllExpensesOnce()
+                                val uri = PdfGenerator.generateAllExpensesReport(
+                                    context = context,
+                                    expenses = expenses,
+                                    grantTotal = uiState.grantState.totalGrant,
+                                    grantSpent = uiState.grantState.totalSpent
+                                )
+                                withContext(Dispatchers.Main) {
+                                    isGeneratingPdf = false
+                                    if (uri != null) {
+                                        PdfGenerator.viewPdf(context, uri)
+                                    } else {
+                                        Toast.makeText(context, "Failed to generate system report", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        }) {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = "Generate PDF Report",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     // Grant Fund button
                     IconButton(onClick = { viewModel.showGrantDialog() }) {
                         Icon(
@@ -824,6 +868,6 @@ fun CreateWorkspaceDialog(
 // ─── Currency formatter ────────────────────────────────────────────────────────
 
 fun formatCurrency(amount: Double): String {
-    val format = NumberFormat.getCurrencyInstance(Locale("si", "LK"))
+    val format = java.text.DecimalFormat("Rs #,##0.00")
     return format.format(amount)
 }

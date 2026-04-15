@@ -10,6 +10,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses WHERE workspaceId = :workspaceId AND syncStatus != 'PENDING_DELETE' ORDER BY createdAt DESC")
     fun getExpensesByWorkspace(workspaceId: Long): Flow<List<Expense>>
 
+    @Query("SELECT * FROM expenses WHERE syncStatus != 'PENDING_DELETE' ORDER BY createdAt DESC")
+    suspend fun getAllExpensesOnce(): List<Expense>
+
     @Query("SELECT * FROM expenses WHERE id = :id")
     suspend fun getExpenseById(id: Long): Expense?
 

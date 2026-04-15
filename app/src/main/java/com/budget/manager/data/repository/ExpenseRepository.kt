@@ -24,6 +24,9 @@ class ExpenseRepository @Inject constructor(
     fun getExpensesByWorkspace(workspaceId: Long): Flow<List<Expense>> =
         expenseDao.getExpensesByWorkspace(workspaceId)
 
+    suspend fun getAllExpensesOnce(): List<Expense> = 
+        expenseDao.getAllExpensesOnce()
+
     fun getTotalSpending(workspaceId: Long): Flow<Double?> =
         expenseDao.getTotalSpendingByWorkspace(workspaceId)
 

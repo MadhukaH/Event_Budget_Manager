@@ -387,6 +387,71 @@ public final class ExpenseDao_Impl implements ExpenseDao {
   }
 
   @Override
+  public Object getAllExpensesOnce(final Continuation<? super List<Expense>> $completion) {
+    final String _sql = "SELECT * FROM expenses WHERE syncStatus != 'PENDING_DELETE' ORDER BY createdAt DESC";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
+    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<Expense>>() {
+      @Override
+      @NonNull
+      public List<Expense> call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfWorkspaceId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceId");
+          final int _cursorIndexOfCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "category");
+          final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
+          final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
+          final int _cursorIndexOfReceiptBase64 = CursorUtil.getColumnIndexOrThrow(_cursor, "receiptBase64");
+          final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
+          final int _cursorIndexOfFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "firestoreId");
+          final int _cursorIndexOfWorkspaceFirestoreId = CursorUtil.getColumnIndexOrThrow(_cursor, "workspaceFirestoreId");
+          final int _cursorIndexOfSyncStatus = CursorUtil.getColumnIndexOrThrow(_cursor, "syncStatus");
+          final int _cursorIndexOfLastModified = CursorUtil.getColumnIndexOrThrow(_cursor, "lastModified");
+          final List<Expense> _result = new ArrayList<Expense>(_cursor.getCount());
+          while (_cursor.moveToNext()) {
+            final Expense _item;
+            final long _tmpId;
+            _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpWorkspaceId;
+            _tmpWorkspaceId = _cursor.getLong(_cursorIndexOfWorkspaceId);
+            final String _tmpCategory;
+            _tmpCategory = _cursor.getString(_cursorIndexOfCategory);
+            final double _tmpAmount;
+            _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
+            final String _tmpNote;
+            _tmpNote = _cursor.getString(_cursorIndexOfNote);
+            final String _tmpReceiptBase64;
+            if (_cursor.isNull(_cursorIndexOfReceiptBase64)) {
+              _tmpReceiptBase64 = null;
+            } else {
+              _tmpReceiptBase64 = _cursor.getString(_cursorIndexOfReceiptBase64);
+            }
+            final long _tmpCreatedAt;
+            _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
+            final String _tmpFirestoreId;
+            _tmpFirestoreId = _cursor.getString(_cursorIndexOfFirestoreId);
+            final String _tmpWorkspaceFirestoreId;
+            _tmpWorkspaceFirestoreId = _cursor.getString(_cursorIndexOfWorkspaceFirestoreId);
+            final SyncStatus _tmpSyncStatus;
+            final String _tmp;
+            _tmp = _cursor.getString(_cursorIndexOfSyncStatus);
+            _tmpSyncStatus = __syncStatusConverter.toSyncStatus(_tmp);
+            final long _tmpLastModified;
+            _tmpLastModified = _cursor.getLong(_cursorIndexOfLastModified);
+            _item = new Expense(_tmpId,_tmpWorkspaceId,_tmpCategory,_tmpAmount,_tmpNote,_tmpReceiptBase64,_tmpCreatedAt,_tmpFirestoreId,_tmpWorkspaceFirestoreId,_tmpSyncStatus,_tmpLastModified);
+            _result.add(_item);
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+          _statement.release();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
   public Object getExpenseById(final long id, final Continuation<? super Expense> $completion) {
     final String _sql = "SELECT * FROM expenses WHERE id = ?";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);

@@ -58,6 +58,8 @@ class HomeViewModel @Inject constructor(
         observeNetwork()
     }
 
+    suspend fun getAllExpensesOnce() = expenseRepository.getAllExpensesOnce()
+
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun loadData() {
         // Merge workspace list + grant settings into one reactive stream

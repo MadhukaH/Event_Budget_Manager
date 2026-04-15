@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.budget.manager.data.model.Expense
@@ -28,6 +29,11 @@ import com.budget.manager.ui.components.DeleteConfirmationDialog
 import com.budget.manager.ui.components.EmptyStateView
 import com.budget.manager.ui.screens.home.formatCurrency
 import com.budget.manager.ui.theme.WorkspaceColors
+import com.budget.manager.util.PdfGenerator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -42,6 +48,9 @@ fun WorkspaceScreen(
     viewModel: WorkspaceViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isGeneratingPdf by remember { mutableStateOf(false) }
     var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
     val workspace = uiState.workspace
     val accentColor = workspace?.let {
@@ -68,6 +77,38 @@ fun WorkspaceScreen(
                     }
                 },
                 actions = {
+                    if (isGeneratingPdf) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        IconButton(onClick = {
+                            if (workspace != null) {
+                                isGeneratingPdf = true
+                                scope.launch(Dispatchers.IO) {
+                                    val uri = PdfGenerator.generateWorkspaceReport(
+                                        context = context,
+                                        workspace = workspace,
+                                        expenses = uiState.expenses,
+                                        totalSpent = uiState.totalSpent
+                                    )
+                                    withContext(Dispatchers.Main) {
+                                        isGeneratingPdf = false
+                                        if (uri != null) {
+                                            PdfGenerator.viewPdf(context, uri)
+                                        } else {
+                                            Toast.makeText(context, "Failed to generate report", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = "Generate PDF Report")
+                        }
+                    }
                     IconButton(onClick = onDashboard) {
                         Icon(Icons.Default.BarChart, contentDescription = "Dashboard")
                     }
