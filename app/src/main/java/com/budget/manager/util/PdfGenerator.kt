@@ -264,7 +264,7 @@ object PdfGenerator {
 
         var currentY = MARGIN
 
-        canvas.drawText("Global Expense Report", MARGIN, currentY, titlePaint)
+        canvas.drawText("කොවුල් වසත් නද - 2026 Report", MARGIN, currentY, titlePaint)
         currentY += 25f
 
         val generatedDate = dateFormat.format(Date())
@@ -383,7 +383,7 @@ object PdfGenerator {
             val outputDir = File(context.cacheDir, "pdfs")
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val file = File(outputDir, "Global_Expense_Report.pdf")
+            val file = File(outputDir, "Kovul_Wasath_Nada_2026_Report.pdf")
             pdfDocument.writeTo(FileOutputStream(file))
             pdfDocument.close()
 
