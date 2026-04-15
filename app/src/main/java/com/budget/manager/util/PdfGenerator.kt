@@ -264,7 +264,7 @@ object PdfGenerator {
 
         var currentY = MARGIN
 
-        canvas.drawText("කොවුල් වසත් නද - 2026 Report", MARGIN, currentY, titlePaint)
+        canvas.drawText("කොවුල් වසත් නද 2026 Budget", MARGIN, currentY, titlePaint)
         currentY += 25f
 
         val generatedDate = dateFormat.format(Date())
